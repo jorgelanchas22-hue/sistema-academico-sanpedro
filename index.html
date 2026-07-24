@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistema Académico San Pedro - Salesianos Triana</title>
 
+<script src="https://accounts.google.com/gsi/client"></script>
+<script src="https://apis.google.com/js/api.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
@@ -18,8 +20,7 @@
   .oculto{display:none !important;}
 
   header{background:#fff;border-bottom:4px solid var(--rojo);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
-  header .logo{color:var(--rojo);font-weight:bold;font-size:22px;line-height:1.1;}
-  header .logo span{font-size:13px;font-weight:normal;display:block;}
+  header .logo img{height:40px;display:block;}
   header .titulo{font-size:18px;font-weight:600;color:#1f2937;}
   .estado{font-size:12px;padding:4px 10px;border-radius:999px;}
   .estado.demo{background:#fef3c7;color:#92400e;}
@@ -38,7 +39,7 @@
 
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;}
   label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;}
-  select,input[type=text],textarea{width:100%;padding:9px;border:1px solid var(--gris-300);border-radius:6px;font-size:14px;font-family:inherit;}
+  select,input[type=text],input[type=password],textarea{width:100%;padding:9px;border:1px solid var(--gris-300);border-radius:6px;font-size:14px;font-family:inherit;}
   textarea{resize:vertical;}
 
   .btn{padding:9px 18px;border-radius:8px;border:none;font-weight:600;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:6px;}
@@ -78,10 +79,12 @@
 <div id="app">
   <header>
     <div style="display:flex;align-items:center;gap:16px;">
-      <div class="logo">salesianos<span>TRIANA</span></div>
+      <div class="logo"><img src="logo.png" alt="Salesianos Triana"></div>
       <div class="titulo">Sistema Académico Integral - San Pedro</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn btn-azul" onclick="conectarDrive()" style="padding:6px 12px;font-size:13px;">Conectar Drive</button>
+      <span id="estadoDrive" style="font-size:12px;color:var(--gris-600);">Drive no conectado</span>
       <span id="estadoConexion" class="estado demo">Modo demo (sin Firebase)</span>
     </div>
   </header>
@@ -93,6 +96,7 @@
       <button id="navNuevoPrograma" onclick="nuevoPrograma()">＋ Nuevo Programa</button>
       <button id="navNuevoRegistro" onclick="nuevoRegistro()">＋ Nuevo Registro</button>
       <button id="navAlumnos" onclick="irVista('alumnos')">🎓 Gestión de Alumnos</button>
+      <button id="navPlantillas" onclick="irVista('plantillas')">📝 Gestión de Plantillas</button>
       <button id="navDashboard" onclick="irVista('dashboard')">📊 Dashboard</button>
     </nav>
 
@@ -103,6 +107,9 @@
 </div>
 
 <script>
+/* =========================================================
+   FIREBASE
+========================================================= */
 const firebaseConfig = {
   apiKey: "AIzaSyChzZjDRP46jGZ7-SeDuR07CD_WMZD-jDc",
   authDomain: "sistema-academico-sanpedro.firebaseapp.com",
@@ -123,6 +130,87 @@ try {
   }
 } catch(e){ console.warn("Firebase no configurado, usando modo demo.", e); }
 
+/* =========================================================
+   GOOGLE DRIVE
+========================================================= */
+const GOOGLE_DRIVE_ACTIVADO = true;
+const GOOGLE_CLIENT_ID = "1073478438907-j8snjcgjkmt2aj8mohurak5gg573nke9.apps.googleusercontent.com";
+const GOOGLE_API_KEY = "AIzaSyCf_g98porQEVZxmKnJNvBHOj-HlATmtj8";
+const CARPETA_RAIZ_DRIVE = "Colegio San Pedro - Registros";
+
+let tokenClient = null;
+let accessToken = null;
+let driveListo = false;
+
+function iniciarGoogleDrive(){
+  if(!GOOGLE_DRIVE_ACTIVADO) return;
+  gapi.load('client', async () => {
+    await gapi.client.init({ apiKey: GOOGLE_API_KEY });
+    await gapi.client.load('drive', 'v3');
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (resp) => {
+        accessToken = resp.access_token;
+        gapi.client.setToken({access_token: accessToken});
+        driveListo = true;
+        actualizarEstadoDrive();
+      }
+    });
+  });
+}
+function conectarDrive(){
+  if(!tokenClient){ alert('Google Drive todavía está cargando, espera un momento e inténtalo de nuevo.'); return; }
+  tokenClient.requestAccessToken();
+}
+function actualizarEstadoDrive(){
+  const el = document.getElementById('estadoDrive');
+  if(el) el.textContent = driveListo ? 'Drive conectado' : 'Drive no conectado';
+}
+
+async function obtenerOCrearCarpeta(nombre, idPadre){
+  const q = `mimeType='application/vnd.google-apps.folder' and name='${nombre.replace(/'/g,"\\'")}' and '${idPadre}' in parents and trashed=false`;
+  const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
+  if(res.result.files && res.result.files.length > 0) return res.result.files[0].id;
+  const crear = await gapi.client.drive.files.create({
+    resource: { name: nombre, mimeType: 'application/vnd.google-apps.folder', parents: [idPadre] },
+    fields: 'id'
+  });
+  return crear.result.id;
+}
+
+async function subirArchivoADrive(nombreArchivo, contenidoHTML, curso, alumno){
+  if(!driveListo){ alert('Conecta Google Drive primero (botón arriba a la derecha).'); return false; }
+  try{
+    const idRaiz = await obtenerOCrearCarpeta(CARPETA_RAIZ_DRIVE, 'root');
+    const idCurso = await obtenerOCrearCarpeta(nombreCursoLegible(curso) || 'Sin curso', idRaiz);
+    const nombreCarpetaAlumno = `${iniciales(alumno)}_${primerTrozo(alumno)}`;
+    const idCarpetaAlumno = await obtenerOCrearCarpeta(nombreCarpetaAlumno, idCurso);
+
+    const boundary = '-------314159265358979323846';
+    const metadata = { name: nombreArchivo + '.html', parents: [idCarpetaAlumno], mimeType: 'text/html' };
+    const multipartBody =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: text/html\r\n\r\n${contenidoHTML}\r\n--${boundary}--`;
+
+    await gapi.client.request({
+      path: '/upload/drive/v3/files',
+      method: 'POST',
+      params: { uploadType: 'multipart' },
+      headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      body: multipartBody
+    });
+    return true;
+  } catch(e){
+    console.error('Error subiendo a Drive', e);
+    alert('Error al subir el archivo a Drive. Revisa la consola para más detalles.');
+    return false;
+  }
+}
+
+/* =========================================================
+   ALUMNOS POR DEFECTO
+========================================================= */
 const alumnosPorCursoDefecto = {
 "1A":["Alejandro Álvarez García","María Benítez López","Carlos Cabrera Ruiz","Daniela Díaz Moreno","Eduardo Fernández Silva","Fátima González Torres","Gabriel Hernández Vega","Helena Jiménez Ramos","Iván López Martín","Julia Martínez Soto","Kevin Muñoz Herrera","Lucía Navarro Peña","Miguel Ortega Castro","Natalia Pérez Vázquez","Óscar Ramírez Jiménez","Paula Rodríguez Luna","Quique Sánchez Molina","Rosa Torres Aguilar","Sergio Vargas Medina","Teresa Vidal Romero"],
 "1B":["Ana Alonso Guerrero","Bruno Blanco Serrano","Carmen Calvo Iglesias","Diego Delgado Prieto","Elena Espinosa Núñez","Fernando Flores Castillo","Gracia García Domínguez","Hugo Herrera Gallego","Isabel Iglesias Morales","Javier Jiménez Fuentes","Lara López Benítez","Manuel Moreno Rubio","Nerea Navarro Campos","Omar Ortiz Valdés","Pilar Pascual Rivera","Raúl Ramos Cortés","Silvia Soto Herrero","Tomás Torres Bermejo","Úrsula Urrutia Leal","Víctor Vega Paredes"],
@@ -135,11 +223,17 @@ const alumnosPorCursoDefecto = {
 "3C":["Alejandra Alvarado Ruiz","Bernardo Bravo Jiménez","Camila Cabrera Sánchez","Daniel Díaz Herrera","Esperanza Espinoza López","Fabián Fuentes Silva","Gloria González Torres","Hugo Hernández Vega","Irene Ibáñez Moreno","Julián Jiménez Castro","Karla Lara Aguilar","Marcelo Martín Peña","Natasha Navarro Ríos","Octavio Ortega Silva","Patricia Pérez Vásquez","Rodrigo Ramos Herrera","Susana Sánchez Morales","Teodoro Torres Aguilar","Ximena Vega Castillo","Yolanda Vargas Méndez"],
 "4A":["Aldea Martín, Sofía","Arancón Ramos, Ángela","Balbontín Martínez, Álvaro","Benítez Fernández, Pablo","Benítez Marín, Antonio","Biedma Garrido, Alejandro","Biedma Garrido, Beatriz","Bonilla Gómez, Javier","Bracero Rodríguez, Darío","Cadenas Sarmiento, María de las Mercedes","Calvarro Luque, Alejandro","Camacho Delgado, Claudia","Campuzano García, Gonzalo","Carvajal Delgado, Victoria","Chen, Yi Qian","Cortés Casado, Rodrigo","Cruz Álvarez, Jacqueline","Del Águila Merino, María","Díaz Ponce de León, Fernando","Escobar Velázquez, Paula","Esquinas De la Torre, Mario","Fernández Román, Álvaro","Gutiérrez Guillén, Pablo","Hurtado Valero, Sergio","Liger García, Estrella","Loaiza Torres, Alicia del Rocío","López López, Francisco de Asís","Martín Salas, Inmaculada","Mejía Zeledon, Reina Triana","Molina García, Blanca","Palmero Rodríguez, Álvaro","Roas Alonso, Sara","Ruesga Velasco, Juan Pablo","Tejero Rocha, Victoria","Troya Díaz, Laura"],
 "4B":["Ángel Ibáñez, Nicolás","Báez Cardinali, Lucía","Brenes Gutiérrez, Ana","Brenes Puelles, Miguel","Bueno González, Paula","Cabrera Fernández, Daniel","Carmona Jiménez, Jazmine","Crespo Rosa, Daniela","Dorado López, Esperanza","Flores Villegas, Jaime","García Porcel, Álvaro Mateo","García Soto, Jesús José","Gener Amador, Ángela","Holgado Guzmán, Ana","Hurtado Díaz, Sara","Iglesias Núñez, Estervina","Mengual Saborido, Carla","Millán Alzate, Hannah","Munar González, Antonio Jesús","Pitot Valerio, Héctor Alejandro","Rosa González, Jaime","Ruiz De la Bandera, Coral","Sánchez Bernal, Darío","Sánchez Campos, Pastora","Sánchez Vera, Nora","Soriano Pedreira, Sergio"],
-"4C":["Cobos Vázquez, Diego","Franco Pérez, Arancha","Gaviño Ramírez, Francisco","Gómez Sánchez, Paula","Gordillo Ramos-Catalina, María","Gutiérrez Reina, Rocío del Mar","Hernández Meléndez, José Luis","Holgado Guzmán, Isabel","León Carmona, Tomás","León Girón, Carlos","Moreno Matas, Alicia","Ocaña Serrano, Francisco Javier","Peñalosa Torrens, Raquel","Pérez Reyes, Paula","Pozas Ruiz, Lucas","Pulido Leñador, Claudia","Ramos Andrés, Rodrigo","Ribera Villarreal, José Andrés","Ríos Iglesias, Carlos","Rodríguez González, Gonzalo","Romero Bernal, Simón","Rueda Carranza, Julia","Salinas Bejarano, Daniel","Sanchís Romero, María del Pilar","Vera Vázquez, Carmen","Villamayor Barreto, Selena","Wang, Tiantian","Xia, Shuyao"]
+"4C":["Cobos Vázquez, Diego","Franco Pérez, Arancha","Gaviño Ramírez, Francisco","Gómez Sánchez, Paula","Gordillo Ramos-Catalina, María","Gutiérrez Reina, Rocío del Mar","Hernández Meléndez, José Luis","Holgado Guzmán, Isabel","León Carmona, Tomás","León Girón, Carlos","Moreno Matas, Alicia","Ocaña Serrano, Francisco Javier","Peñalosa Torrens, Raquel","Pérez Reyes, Paula","Pozas Ruiz, Lucas","Pulido Leñador, Claudia","Ramos Andrés, Rodrigo","Ribera Villarreal, José Andrés","Ríos Iglesias, Carlos","Rodríguez González, Gonzalo","Romero Bernal, Simón","Rueda Carranza, Julia","Salinas Bejarano, Daniel","Sanchís Romero, María del Pilar","Vera Vázquez, Carmen","Villamayor Barreto, Selena","Wang, Tiantian","Xia, Shuyao"],
+"1BACH_A": [],
+"1BACH_B": [],
+"1BACH_C": [],
+"2BACH_A": [],
+"2BACH_B": [],
+"2BACH_C": []
 };
 
 let alumnosPorCurso = {};
-const cursos = Object.keys(alumnosPorCursoDefecto);
+const cursos = ["1A","1B","1C","2A","2B","2C","3A","3B","3C","4A","4B","4C","1BACH_A","1BACH_B","1BACH_C","2BACH_A","2BACH_B","2BACH_C"];
 
 const asignaturas = ['Lengua Castellana y Literatura','Matemáticas','Geografía e Historia','Biología y Geología','Física y Química','Inglés','Francés','Educación Física','Tecnología','Música','Educación Plástica Visual y Audiovisual','Religión/Valores Éticos','Latín','Economía','Filosofía','Iniciación a la Actividad Emprendedora','Segunda Lengua Extranjera','Cultura Clásica'];
 
@@ -147,18 +241,59 @@ const programasTipo = ['Programa de Profundización','Programa de Refuerzo Educa
 
 const aspectosDefecto = () => ([
   {titulo:'Eficacia de las medidas', contenido:'La eficacia ha sido positiva ya que las medidas adoptadas en su momento han servido para que el alumno obtenga los objetivos previamente planteados y estipulados para su consecución.'},
-  {titulo:'Metodología, materiales...', contenido:'Se ha adaptado en tiempo y en ejecución las pruebas. Además, se ha hecho un seguimiento individualizado para comprobar la eficacia de las medidas adoptadas.'},
-  {titulo:'Temporalización', contenido:'A lo largo del trimestre, a través de un seguimiento exhaustivo y un compromiso con el alumno.'},
-  {titulo:'Acuerdos-Sugerencias de cara al próximo trimestre', contenido:'Mantener el mismo ritmo y adaptar los contenidos de manera más profunda en caso de que sea necesario.'}
+  {titulo:'Metodología, materiales...', contenido:'Se ha adaptado en tiempo y en ejecución las pruebas. Además, se ha hecho un seguimiento individualizado para comprobar la eficacia de las medidas adoptadas. Dedicar más tiempo en las explicaciones de tareas'},
+  {titulo:'Temporalización', contenido:'A lo largo del tercer trimestre, a través de un seguimiento exhaustivo y un compromiso con el alumno'},
+  {titulo:'Acuerdos-Sugerencias de cara al próximo trimestre', contenido:'Mantener el mismo ritmo y adaptarle los contenidos de manera más profunda en caso de que sea necesario'}
 ]);
 
 const programaDefecto = () => ({
-  metodologia:'Metodología activa y participativa, adaptada a los ritmos y estilos de aprendizaje del alumnado, con atención personalizada y refuerzo de la autoestima.',
-  actividades:'Explicaciones adaptadas, organizadores gráficos, trabajo cooperativo, tutorización entre iguales, actividades progresivas y feedback constante.',
-  recursos:'Ubicación preferente en el aula, materiales adaptados (textos, esquemas, recursos digitales), coordinación con el departamento de orientación y las familias.',
-  evaluacion:'Adaptación de pruebas escritas (tiempo, formato), evaluación continua con mayor peso (70%), rúbricas adaptadas y valoración del progreso individual.'
+  metodologia:'La metodología se fundamentará en los principios de atención personalizada y aprendizaje inclusivo, adaptándose a los diferentes ritmos y estilos de aprendizaje del alumnado.\n\nSe implementará una metodología activa y participativa que:\n• Fomente el pensamiento crítico y reflexivo\n• Promueva la capacidad de aprender de forma autónoma\n• Integre el trabajo cooperativo y colaborativo\n• Favorezca la conexión con situaciones de la vida cotidiana\n• Desarrolle competencias transversales\n• Utilice recursos variados y motivadores\n\nLa intervención educativa se centrará en reforzar la autoestima y confianza del alumno/a, proporcionando experiencias de éxito que favorezcan su progreso académico y personal.',
+  actividades:'ACTIVIDADES ESPECÍFICAS DEL PROGRAMA:\n\nActividades de desarrollo y comprensión:\n• Explicaciones adaptadas con ejemplos específicos\n• Uso de organizadores gráficos y mapas conceptuales\n• Actividades de síntesis y análisis\n• Ejercicios de aplicación progresiva\n\nGestión del tiempo y planificación:\n• Establecimiento de rutinas de trabajo\n• Uso de agenda y planificadores\n• División de tareas en pasos manejables\n• Tiempo adaptado para la realización de actividades\n\nActividades cooperativas y de participación:\n• Trabajo en grupos variados\n• Tutorización entre iguales\n• Proyectos colaborativos\n• Presentaciones orales adaptadas\n\nDesarrollo de competencias específicas:\n• Reconocimiento de logros y avances\n• Actividades desafiantes acordes al nivel\n• Feedback constructivo y específico\n• Actividades donde pueda demostrar sus capacidades',
+  recursos:'RECURSOS ORGANIZATIVOS:\n• Ubicación preferente: cerca del docente y junto a compañeros colaborativos\n• Agrupamientos flexibles según las actividades\n• Distribución del aula que favorezca la concentración\n• Espacios de trabajo tranquilo cuando sea necesario\n\nRECURSOS DIDÁCTICOS:\nMateriales adaptados:\n• Textos con diferente grado de complejidad\n• Materiales manipulativos y visuales\n• Recursos digitales interactivos\n• Esquemas, resúmenes y organizadores gráficos\n\nHerramientas de apoyo:\n• Calculadora científica (si procede)\n• Diccionarios y glosarios especializados\n• Aplicaciones educativas específicas\n• Material audiovisual complementario\n\nRECURSOS HUMANOS:\n• Apoyo del profesor de área\n• Coordinación con el departamento de orientación\n• Colaboración con las familias\n• Seguimiento tutorial personalizado',
+  evaluacion:'INSTRUMENTOS DE EVALUACIÓN ADAPTADOS:\n\nPRUEBAS ESCRITAS:\n• Adaptación de la presentación: letra más grande, espacios amplios\n• Fragmentación de exámenes extensos en varias sesiones\n• Preguntas claras y precisas, evitando ambigüedades\n• Tiempo adicional para la realización (hasta 30% más)\n• Posibilidad de uso de material de apoyo específico\n\nEVALUACIÓN CONTINUA:\n• Observación sistemática del trabajo diario\n• Registro de participación y esfuerzo\n• Valoración de tareas y proyectos\n• Portfolio de trabajos realizados\n\nEVALUACIÓN COMPETENCIAL:\n• Rúbricas adaptadas a los objetivos específicos\n• Autoevaluación y coevaluación\n• Evaluación de procesos, no solo de resultados\n• Pruebas orales como alternativa o complemento\n\nCRITERIOS DE CALIFICACIÓN:\n• Mayor peso de la evaluación continua (70%)\n• Valoración del progreso individual\n• Consideración del esfuerzo y actitud\n• Retroalimentación constante y constructiva'
 });
 
+/* =========================================================
+   PLANTILLAS POR TIPO DE PROGRAMA
+========================================================= */
+const plantillasPorTipoProgramaDefecto = {
+  'Programa de Profundización': {
+    metodologia: '- Metodología expositiva.\n- Metodología por descubrimiento.\n- Actividades en grupo cooperativo por parejas.\n- Trabajo individual e independiente.\n- Trabajo de investigación.',
+    actividades: '- De clasificación en función de las distintas categorías.\n- De aplicación de contenidos: resolver problemas, etc.\n- De relacionar conceptos e ideas.\n- De producción y creación personal.\n- Abiertas en las que el alumno/a tiene autonomía para decidir el plan a elegir.',
+    recursos: 'RECURSOS DIDÁCTICOS:\n- Libros de texto y cuadernos.\n- Classroom\n- Programas informáticos, ordenador.\n- Otros: materiales del aula.\n\nAGRUPAMIENTOS, DISTRIBUCIÓN DE ESPACIOS Y TIEMPOS:\n- Individual.\n- Pequeño grupo homogéneo.\n- Pequeño grupo heterogéneo o grupo cooperativo.\n- Espacio único y común.',
+    evaluacion: '- Se realiza una evaluación inicial que permita conocer el punto de partida del alumno/a.\n- La recogida de información se realiza de forma continua.\n- La evaluación es criterial, es decir valora los progresos en función del punto de partida de cada alumno/a, evitando las comparaciones.\n- Se utilizan instrumentos muy variados: Ejercicios con apuntes, investigación, ejercicios de curso superior, etc.'
+  },
+  'Programa de Refuerzo NEAE Ed.Básica': {
+    metodologia: 'En este apartado, haremos referencia a la metodología que vamos a desarrollar en el grupo clase y concretamente con este alumno/a.\n\nLa metodología tendrá en cuenta los diferentes ritmos y estilos de aprendizaje del alumnado, favoreciendo la capacidad de aprender por sí mismos y promuevan el trabajo en equipo. Se fomentará especialmente una metodología centrada en la actividad y participación del alumnado que favorezca el pensamiento racional y crítico, el trabajo individual y cooperativo del alumnado en el aula, que conlleve la lectura y la investigación, así como las diferentes posibilidades de expresión. Se integrarán en todas las áreas, referencias a la vida cotidiana y al entorno inmediato del alumnado. El objeto central de la práctica educativa es que el alumnado alcance el máximo desarrollo de sus capacidades y competencias y no el de adquirir de forma aislada los contenidos de las áreas, ya que estos son un elemento del currículo que sirve de instrumento para facilitar el aprendizaje.\n\n1. La metodología tendrá un carácter fundamentalmente activo, motivador y participativo, partirá de los intereses del alumnado, favorecerá el trabajo individual, cooperativo y el aprendizaje entre iguales e integrará en todas las áreas, referencias a la vida cotidiana y al entorno inmediato.\n2. Permitirá la integración de los aprendizajes, poniéndolos en relación con distintos tipos de contenidos y utilizándolos de manera efectiva en diferentes situaciones y contextos.\n3. Se orientará al desarrollo de competencias clave, a través de situaciones educativas que posibiliten, fomenten y desarrollen conexiones con las prácticas sociales y culturales de la comunidad.\n4. Favorecerá el desarrollo de actividades y tareas relevantes, haciendo uso de recursos y materiales didácticos diversos.',
+    actividades: 'TIPOS DE ACTIVIDADES Y TAREAS (comunes, de refuerzo, adaptadas, específicas):\n\n• Asegurarse de que ha recibido las instrucciones necesarias para poder desarrollar las tareas encomendadas.\n• Ofrecerle más tiempo para el desarrollo de las tareas.\n• Secuenciar la tarea en pequeños pasos e ir supervisando.\n• Dedicar un tiempo para que pueda ordenar, organizar, planificar lo que tiene que hacer.\n• Hacerle ser protagonista en momentos puntuales para mejorar su autoestima utilizando el refuerzo positivo y participando en cuestiones comunes de la clase.\n• Supervisar la tarea de forma más continuada para que pueda ir recibiendo un feedback del trabajo que va realizando, permitiéndole así retroalimentarse y hacerle consciente de aquellas dudas o errores que puedan surgir y que pueda corregir o solucionar, reforzando su atención para la próxima vez.\n• Tutorización por parte de algún compañero en la realización de tareas que presentan algún tipo de dificultad para el alumno.\n• Actividades de tipo cooperativo junto con el grupo-clase.\n• Actividades de refuerzo, de recuperación...',
+    recursos: 'RECURSOS DIDÁCTICOS, AGRUPAMIENTOS, DISTRIBUCIÓN DE ESPACIOS Y TIEMPOS:\n\n• Sentar al alumno cerca del profesor para facilitar el contacto visual y la supervisión de las tareas, evitando distracciones y al lado de algún compañero tranquilo que le sirva de modelo.\n• Tutorización entre iguales.\n• Supervisión de la agenda diariamente, utilizándose como instrumento de información periódica a la familia.\n• Tipo de agrupamiento: grupo-clase, grupo pequeño, por pareja con tutorización, individualizado, cooperativo.\n• Utilizará materiales: ordinarios, adaptados, específicos, de refuerzo, manipulativos, visuales...\n• Revisión diaria de la agenda para informar a la familia sobre aquellas actividades que no ha podido acabar en clase y, por ende, debe acabar en casa. Esta medida ha sido acordada con la familia.\n• Será atendido por el/la profesional del Departamento de Orientación del Aula Compensatoria de manera semanal/quincenal (si procede).\n• Uso de instrucciones claras, autoinstrucciones, etc.',
+    evaluacion: 'INSTRUMENTOS DE EVALUACIÓN (Adaptaciones en formato y tiempo, utilización de recursos didácticos e instrumentos como apoyo a la evaluación, etc.):\n\n• Asegurarse de que entiende bien lo que se le pregunta y leer previamente las preguntas con el alumno por si hay que aclarar alguna cuestión.\n• Cuando sea un examen largo se podrá fraccionar en partes y en tiempos diferentes.\n• Las pruebas es mejor que sean a primera hora de la mañana y sin coincidir con otro control en el día.\n• Las pruebas escritas se adaptarán según sus necesidades (mayor espacio entre cuestiones, de mayor a menor complejidad las cuestiones, preguntas a relacionar, pruebas orales…)\n• Valoración del trabajo diario del alumno en clase.\n• Utilización de rúbricas que faciliten la evaluación y autoevaluación.'
+  },
+  'Programa de Refuerzo Educativo': {
+    metodologia: 'FORMAS DE ACCESO A LA INFORMACIÓN (METODOLOGÍA):\n\nLa metodología tendrá en cuenta los diferentes ritmos y estilos de aprendizaje del alumnado, favoreciendo la capacidad de aprender por sí mismos y promuevan el trabajo en equipo. Se fomentará especialmente una metodología centrada en la actividad y participación del alumnado que favorezca el pensamiento racional y crítico, el trabajo individual y cooperativo del alumnado en el aula, que conlleve la lectura y la investigación, así como las diferentes posibilidades de expresión.\n\nSe integrarán en todas las áreas, referencias a la vida cotidiana y al entorno inmediato del alumnado. El objeto central de la práctica educativa es que el alumnado alcance el máximo desarrollo de sus capacidades y competencias y no el de adquirir de forma aislada los contenidos de las áreas, ya que estos son un elemento del currículo que sirve de instrumento para facilitar el aprendizaje.\n\n• El alumno trabajará dentro de su grupo-clase ubicado en el aula, siempre que sea posible, en un lugar que favorezca la observación directa del profesor.\n• Se favorecerá tanto el trabajo cooperativo como el trabajo individual, con un carácter fundamentalmente activo y motivador que le ayude a reforzar aquellos aspectos donde encuentre mayores dificultades, a través de los recursos didácticos establecidos.',
+    actividades: 'TIPOS DE ACTIVIDADES Y TAREAS:\n\nEn este apartado, haremos referencia al tipo de actividades y tareas que tendremos en cuenta con este alumno concreto.\n• Asegurarse de que ha recibido las instrucciones necesarias para poder desarrollar las tareas encomendadas.\n• Secuenciar la tarea en pequeños pasos e ir supervisando.\n• Dedicar un tiempo para que pueda ordenar, organizar, planificar lo que tiene que hacer.\n• Supervisar la tarea de forma más continuada para que pueda ir recibiendo un feedback del trabajo que va realizando, permitiéndole así retroalimentarse y hacerle consciente de aquellas dudas o errores que puedan surgir y que pueda corregir o solucionar, reforzando su atención para la próxima vez.',
+    recursos: 'RECURSOS DIDÁCTICOS:\n• Utilizará materiales: ordinarios, específicos, de refuerzo, manipulativos, visuales…\n• Uso de instrucciones claras, autoinstrucciones, etc.\n• El alumno utilizará los materiales ordinarios y se le ofrecerán otros materiales de refuerzo en forma de fichas y cuestionarios en Classroom.\n\nAGRUPAMIENTOS, DISTRIBUCIÓN, ESPACIOS Y TIEMPO:\nTipo de agrupamiento: individualizado.',
+    evaluacion: 'INSTRUMENTOS DE EVALUACIÓN:\n• Cuando sea una prueba escrita larga, se podrá fraccionar en partes y en tiempos diferentes, o se le podrá reducir el número de preguntas.\n• Las pruebas escritas se adaptarán según sus necesidades y según el tipo de prueba: mayor espacio entre cuestiones, de mayor a menor complejidad las cuestiones, resaltado de información mediante subrayado y negrita, etc.\n• Se valorará el trabajo diario del alumno en clase.'
+  },
+  'Programa de Mejora del Aprendizaje': {
+    metodologia: 'FORMAS DE ACCESO A LA INFORMACIÓN (METODOLOGÍA):\n\nLa metodología tendrá en cuenta los diferentes ritmos y estilos de aprendizaje del alumnado, favoreciendo la capacidad de aprender por sí mismos y promuevan el trabajo en equipo. Se fomentará especialmente una metodología centrada en la actividad y participación del alumnado que favorezca el pensamiento racional y crítico, el trabajo individual y cooperativo del alumnado en el aula, que conlleve la lectura y la investigación, así como las diferentes posibilidades de expresión.\n\nSe integrarán en todas las áreas, referencias a la vida cotidiana y al entorno inmediato del alumnado. El objeto central de la práctica educativa es que el alumnado alcance el máximo desarrollo de sus capacidades y competencias y no el de adquirir de forma aislada los contenidos de las áreas, ya que estos son un elemento del currículo que sirve de instrumento para facilitar el aprendizaje.\n\n1. La metodología tendrá un carácter fundamentalmente activo, motivador y participativo, partirá de los intereses del alumnado, favorecerá el trabajo individual, cooperativo y el aprendizaje entre iguales e integrará en todas las áreas, referencias a la vida cotidiana y al entorno inmediato.\n2. Permitirá la integración de los aprendizajes, poniéndolos en relación con distintos tipos de contenidos y utilizándolos de manera efectiva en diferentes situaciones y contextos.\n3. Se orientará al desarrollo de competencias clave, a través de situaciones educativas que posibiliten, fomenten y desarrollen conexiones con las prácticas sociales y culturales de la comunidad.\n4. Favorecerá el desarrollo de actividades y tareas relevantes, haciendo uso de recursos y materiales didácticos diversos.',
+    actividades: 'TIPOS DE ACTIVIDADES Y TAREAS:\n\nAsegurarse de que ha recibido las instrucciones necesarias para poder desarrollar las tareas encomendadas.\n• Ofrecerle más tiempo para el desarrollo de las tareas.\n• Dedicar un tiempo para que pueda ordenar, organizar, planificar lo que tiene que hacer.\n• Supervisar la tarea de forma más continuada para que pueda ir recibiendo un feedback del trabajo que va realizando, permitiéndole así retroalimentarse y hacerle consciente de aquellas dudas o errores que puedan surgir y que pueda corregir o solucionar, reforzando su atención para la próxima vez.\n• Actividades de refuerzo.',
+    recursos: 'RECURSOS DIDÁCTICOS:\n• Sentar al alumno cerca del profesor para facilitar el contacto visual y la supervisión de las tareas, evitando distracciones y al lado de algún compañero tranquilo que le sirva de modelo.\n• Tutorización entre iguales.\n• Uso de instrucciones claras, autoinstrucciones, etc.\n\nAGRUPAMIENTOS, DISTRIBUCIÓN, ESPACIOS Y TIEMPO:\n• Tipo de agrupamiento: grupo-clase, grupo pequeño, por pareja con tutorización, individualizado, cooperativo.\n• Utilizará materiales: ordinarios, adaptados, específicos, de refuerzo, manipulativos, visuales…\n• Cuando sea un examen largo se podrá fraccionar en partes y en tiempos diferentes.',
+    evaluacion: 'INSTRUMENTOS DE EVALUACIÓN:\n• Asegurarse de que entiende bien lo que se le pregunta y leer previamente las preguntas con el alumno por si hay que aclarar alguna cuestión.\n• Las pruebas escritas se adaptarán según sus necesidades.\n• Valoración del trabajo diario del alumno en clase.'
+  },
+  'Programa de Necesidades Educativas Especiales': {
+    metodologia: 'ETAPA Y NIVEL DE REFERENCIA:\nEtapa de referencia: [indicar etapa]\nNivel de referencia: [indicar nivel]\n\nLas actividades serán adaptadas a las necesidades concretas del alumno/a y se presentarán con un grado de dificultad de menor a mayor con el fin de que vaya adquiriendo nuevos conocimientos en esta materia.',
+    actividades: 'ADAPTACIÓN EN LAS ACTIVIDADES Y TAREAS:\n\nTipos de actividades y tareas que se trabajarán en el aula:\n- Actividades individuales: con el fin de aumentar su autonomía. Se realizarán en el cuaderno o a través de fichas adaptadas, teniendo siempre como centro las necesidades que demanda el alumno/a.\n- Actividades en grupo: para reforzar y trabajar las habilidades sociales y las relaciones con sus iguales, y aprender de otra manera los saberes básicos propuestos para el curso.\n- Fichas evaluables: para saber si el alumno/a está adquiriendo los saberes básicos trabajados.\n- Exposición y presentación de trabajos: tanto de manera grupal como individual.\n- Actividades interactivas: mediante visionado/audición en pantalla o a través del ordenador de la profesora.\n\nTodas estas actividades estarán adaptadas a las necesidades del alumno/a, cambiando el tipo de adaptación si fuese necesario en cualquier momento del curso escolar.',
+    recursos: 'RECURSOS MATERIALES: Bibliografía, publicaciones, programas editados, software informático, referencias web, materiales didácticos.\n\nLibro, cuaderno, material adaptado, actividades de refuerzo, programas educativos para determinados contenidos. Se utilizarán recursos técnicos y didácticos que permitan una metodología más activa en caso necesario.',
+    evaluacion: 'PROCEDIMIENTOS E INSTRUMENTOS DE EVALUACIÓN:\n\nLa evaluación de la materia tendrá en todo momento como referentes los criterios de evaluación y su contribución al grado de adquisición de las competencias específicas.\n\nSe utilizarán distintos instrumentos, ajustados a los criterios de evaluación y a las características específicas del alumnado: cuestionarios, formularios, presentaciones, exposiciones orales, producciones escritas y/o digitales, pruebas, escalas de observación, rúbricas o portfolios, cuaderno, actividades interactivas.\n\nTodos los criterios de evaluación (relacionados con los saberes básicos) indicados en la adaptación serán ponderados con igual peso.\n• Los diferentes instrumentos se evaluarán también por criterios.\n• Cada criterio será puntuado según el grado de adquisición de los saberes básicos relacionados con ese criterio (valoración del 1 al 10).\n• Los resultados de la evaluación trimestral se expresan mediante: Insuficiente (IN), Suficiente (SF), Bien (B), Notable (NT) y Sobresaliente (SB), siendo negativa el Insuficiente y positivas las demás. Correspondencia numérica: IN (1-4), SF (5), B (6), NT (7-8), SB (9-10).\n• La nota del trimestre vendrá determinada por la nota media de los criterios evaluados en los diferentes instrumentos de dicho trimestre.\n• Si la nota media es igual o superior a 5, el alumno/a aprueba el trimestre; si es inferior a 5, lo suspende.\n\nCRITERIOS DE CALIFICACIÓN: evaluación continua global (media aritmética de todos los referentes evaluados desde el comienzo de curso). Redondeo a la unidad más próxima si la nota es ≥5; por defecto si es <5.\n\nA la finalización del curso, la calificación final se obtendrá de la media aritmética de todos los referentes evaluados durante el curso.'
+  }
+};
+
+let plantillasPorTipoPrograma = {};
+
+/* =========================================================
+   ESTADO
+========================================================= */
 let registros = [];
 let programas = [];
 let vista = 'programas';
@@ -167,7 +302,13 @@ let mostrandoPreview = false;
 let registroActual = null;
 let programaActual = null;
 let cursoSeleccionadoGestion = cursos[0] || '';
+let plantillaActualNombre = null;
+let plantillaActual = null;
+let modoEdicionPlantilla = false;
 
+/* =========================================================
+   INICIO / PERSISTENCIA
+========================================================= */
 function iniciarApp(){
   document.getElementById('estadoConexion').textContent = modoFirebase ? 'Conectado a Firebase' : 'Modo demo (local)';
   document.getElementById('estadoConexion').className = 'estado ' + (modoFirebase ? 'online' : 'demo');
@@ -181,11 +322,19 @@ function iniciarApp(){
       db.ref('alumnos').on('value', s=>{ alumnosPorCurso = s.val()||{}; if(vista==='alumnos') render(); });
       render();
     });
+    db.ref('plantillas').once('value', snap=>{
+      if(snap.val()){ plantillasPorTipoPrograma = snap.val(); }
+      else { plantillasPorTipoPrograma = plantillasPorTipoProgramaDefecto; db.ref('plantillas').set(plantillasPorTipoPrograma); }
+      db.ref('plantillas').on('value', s=>{ plantillasPorTipoPrograma = s.val()||{}; if(vista==='plantillas') render(); });
+      render();
+    });
   } else {
     registros = JSON.parse(localStorage.getItem('sanpedro_registros')||'[]');
     programas = JSON.parse(localStorage.getItem('sanpedro_programas')||'[]');
     const guardados = localStorage.getItem('sanpedro_alumnos');
     alumnosPorCurso = guardados ? JSON.parse(guardados) : alumnosPorCursoDefecto;
+    const plantillasGuardadas = localStorage.getItem('sanpedro_plantillas');
+    plantillasPorTipoPrograma = plantillasGuardadas ? JSON.parse(plantillasGuardadas) : plantillasPorTipoProgramaDefecto;
     render();
   }
 }
@@ -199,13 +348,17 @@ function guardarColeccion(nombre, arr){
   }
 }
 function guardarAlumnos(){
-  if(modoFirebase){
-    db.ref('alumnos').set(alumnosPorCurso);
-  } else {
-    localStorage.setItem('sanpedro_alumnos', JSON.stringify(alumnosPorCurso));
-  }
+  if(modoFirebase){ db.ref('alumnos').set(alumnosPorCurso); }
+  else { localStorage.setItem('sanpedro_alumnos', JSON.stringify(alumnosPorCurso)); }
+}
+function guardarPlantillas(){
+  if(modoFirebase){ db.ref('plantillas').set(plantillasPorTipoPrograma); }
+  else { localStorage.setItem('sanpedro_plantillas', JSON.stringify(plantillasPorTipoPrograma)); }
 }
 
+/* =========================================================
+   UTILIDADES
+========================================================= */
 function iniciales(nombre){
   if(!nombre) return 'SA';
   const partes = nombre.trim().split(/[\s,]+/).filter(Boolean);
@@ -215,14 +368,55 @@ function primerTrozo(nombre){
   return nombre.split(',')[0]?.trim() || nombre.split(' ')[0];
 }
 function nombreCursoLegible(c){
-  return c + ' ESO';
+  const mapa = {
+    '1A':'1º A ESO', '1B':'1º B ESO', '1C':'1º C ESO',
+    '2A':'2º A ESO', '2B':'2º B ESO', '2C':'2º C ESO',
+    '3A':'3º A ESO', '3B':'3º B ESO', '3C':'3º C ESO',
+    '4A':'4º A ESO', '4B':'4º B ESO', '4C':'4º C ESO',
+    '1BACH_A':'1º A Bachillerato', '1BACH_B':'1º B Bachillerato', '1BACH_C':'1º C Bachillerato',
+    '2BACH_A':'2º A Bachillerato', '2BACH_B':'2º B Bachillerato', '2BACH_C':'2º C Bachillerato'
+  };
+  return mapa[c] || c;
 }
 function esc(s){ return (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+function alumnosConProgramaEnCurso(curso){
+  if(!curso) return [];
+  const nombres = new Set();
+  programas.forEach(p=>{ if(p.curso === curso) nombres.add(p.alumno); });
+  return [...nombres].sort((a,b)=>a.localeCompare(b,'es'));
+}
+
+function alumnosPendientesDeSeguimiento(){
+  const alumnosConRegistro = new Set(registros.map(r => r.alumno));
+  const vistos = new Set();
+  const pendientes = [];
+  programas.forEach(p=>{
+    if(!alumnosConRegistro.has(p.alumno) && !vistos.has(p.alumno)){
+      vistos.add(p.alumno);
+      pendientes.push({ alumno: p.alumno, curso: p.curso, tipoPrograma: p.tipoPrograma });
+    }
+  });
+  return pendientes;
+}
+
+/* =========================================================
+   NAVEGACIÓN
+========================================================= */
 function irVista(v){ vista=v; mostrandoPreview=false; render(); }
-function nuevoRegistro(){
+function nuevoRegistro(alumnoPre, cursoPre, programaPre){
   modoEdicion=false; mostrandoPreview=false;
-  registroActual = { id:null, programa:programasTipo[0], programaPersonalizado:'', area:'', profesor:'', alumno:'', curso:'', evaluacion:'', aspectos:aspectosDefecto() };
+  registroActual = {
+    id:null,
+    programa: programaPre || programasTipo[0],
+    programaPersonalizado:'',
+    area:'',
+    profesor:'',
+    alumno: alumnoPre || '',
+    curso: cursoPre || '',
+    evaluacion:'',
+    aspectos:aspectosDefecto()
+  };
   vista='formRegistro'; render();
 }
 function nuevoPrograma(){
@@ -232,10 +426,13 @@ function nuevoPrograma(){
   vista='formPrograma'; render();
 }
 
+/* =========================================================
+   RENDER
+========================================================= */
 function render(){
   document.querySelectorAll('nav button').forEach(b=>b.className='');
-  const mapa = {programas:'navProgramas', registros:'navRegistros', dashboard:'navDashboard', formPrograma:'navNuevoPrograma', formRegistro:'navNuevoRegistro', alumnos:'navAlumnos'};
-  const colores = {navProgramas:'activo-azul', navRegistros:'activo-rojo', navDashboard:'activo-verde', navNuevoPrograma:'activo-azul', navNuevoRegistro:'activo-rojo', navAlumnos:'activo-verde'};
+  const mapa = {programas:'navProgramas', registros:'navRegistros', dashboard:'navDashboard', formPrograma:'navNuevoPrograma', formRegistro:'navNuevoRegistro', alumnos:'navAlumnos', plantillas:'navPlantillas', formPlantilla:'navPlantillas'};
+  const colores = {navProgramas:'activo-azul', navRegistros:'activo-rojo', navDashboard:'activo-verde', navNuevoPrograma:'activo-azul', navNuevoRegistro:'activo-rojo', navAlumnos:'activo-verde', navPlantillas:'activo-azul'};
   const activoId = mapa[vista];
   if(activoId) document.getElementById(activoId).className = colores[activoId];
 
@@ -244,6 +441,8 @@ function render(){
   else if(vista==='registros') cont.innerHTML = vistaListaRegistros();
   else if(vista==='dashboard') cont.innerHTML = vistaDashboard();
   else if(vista==='alumnos') cont.innerHTML = vistaGestionAlumnos();
+  else if(vista==='plantillas') cont.innerHTML = vistaListaPlantillas();
+  else if(vista==='formPlantilla') cont.innerHTML = formPlantilla();
   else if(vista==='formPrograma') cont.innerHTML = mostrandoPreview ? previewPrograma() : formPrograma();
   else if(vista==='formRegistro') cont.innerHTML = mostrandoPreview ? previewRegistro() : formRegistro();
 }
@@ -262,6 +461,9 @@ function vistaDashboard(){
   </div>`;
 }
 
+/* =========================================================
+   GESTIÓN DE ALUMNOS
+========================================================= */
 function vistaGestionAlumnos(){
   return `
   <div class="card">
@@ -284,7 +486,7 @@ function vistaGestionAlumnos(){
 
     <div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:20px;">
       <label>Importar lista completa de clase (un alumno por línea)</label>
-      <textarea id="listaAlumnosInput" rows="8" placeholder="Pega aquí la lista completa, un nombre por línea. Ejemplo:&#10;García López, Ana&#10;Martínez Ruiz, Carlos&#10;..."></textarea>
+      <textarea id="listaAlumnosInput" rows="8" placeholder="Pega aquí la lista completa, un nombre por línea."></textarea>
       <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
         <button class="btn btn-azul" onclick="importarListaAlumnos(false)">📋 Añadir a la lista actual</button>
         <button class="btn btn-rojo" onclick="importarListaAlumnos(true)">🔄 Reemplazar lista completa</button>
@@ -306,10 +508,7 @@ function vistaGestionAlumnos(){
   </div>`;
 }
 
-function cambiarCursoGestion(curso){
-  cursoSeleccionadoGestion = curso;
-  render();
-}
+function cambiarCursoGestion(curso){ cursoSeleccionadoGestion = curso; render(); }
 
 function añadirAlumno(){
   const input = document.getElementById('nuevoAlumnoInput');
@@ -326,9 +525,7 @@ function importarListaAlumnos(reemplazar){
   const textarea = document.getElementById('listaAlumnosInput');
   const texto = textarea.value.trim();
   if(!texto){ alert('Pega primero la lista de alumnos, un nombre por línea'); return; }
-
   const nombresNuevos = texto.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
-
   if(nombresNuevos.length === 0){ alert('No se ha detectado ningún nombre válido'); return; }
 
   if(reemplazar){
@@ -344,7 +541,6 @@ function importarListaAlumnos(reemplazar){
     alumnosPorCurso[cursoSeleccionadoGestion].sort((a,b)=>a.localeCompare(b,'es'));
     alert(`Añadidos ${añadidos} alumnos nuevos (${nombresNuevos.length - añadidos} ya estaban en la lista y se han ignorado).`);
   }
-
   textarea.value = '';
   guardarAlumnos();
   render();
@@ -357,6 +553,81 @@ function eliminarAlumno(i){
   render();
 }
 
+/* =========================================================
+   GESTIÓN DE PLANTILLAS
+========================================================= */
+function vistaListaPlantillas(){
+  const nombres = Object.keys(plantillasPorTipoPrograma);
+  return `<div class="card">
+    <h2>Gestión de Plantillas por Tipo de Programa</h2>
+    <p style="color:#6b7280;font-size:14px;margin-top:-10px;">Estas plantillas rellenan automáticamente los 4 campos al elegir el tipo de programa en "Nuevo Programa".</p>
+    <button class="btn btn-verde" onclick="nuevaPlantilla()" style="margin-bottom:16px;">＋ Crear nuevo tipo de programa</button>
+    ${nombres.length===0 ? '<p style="color:#9ca3af;">No hay plantillas guardadas.</p>' :
+      nombres.map(n=>`
+        <div class="item-lista">
+          <div class="info"><h3>${esc(n)}</h3></div>
+          <div class="acciones">
+            <button class="btn-peq" title="Editar" onclick="editarPlantilla('${esc(n).replace(/'/g,"\\'")}')">✏️</button>
+            <button class="btn-peq" title="Eliminar" onclick="eliminarPlantilla('${esc(n).replace(/'/g,"\\'")}')">🗑️</button>
+          </div>
+        </div>`).join('')}
+  </div>`;
+}
+
+function nuevaPlantilla(){
+  modoEdicionPlantilla = false;
+  plantillaActualNombre = '';
+  plantillaActual = { metodologia:'', actividades:'', recursos:'', evaluacion:'' };
+  vista = 'formPlantilla'; render();
+}
+function editarPlantilla(nombre){
+  modoEdicionPlantilla = true;
+  plantillaActualNombre = nombre;
+  plantillaActual = { ...plantillasPorTipoPrograma[nombre] };
+  vista = 'formPlantilla'; render();
+}
+function eliminarPlantilla(nombre){
+  if(!confirm(`¿Eliminar la plantilla "${nombre}"? Esto no afecta a los programas ya creados con este tipo.`)) return;
+  delete plantillasPorTipoPrograma[nombre];
+  guardarPlantillas();
+  render();
+}
+
+function formPlantilla(){
+  const p = plantillaActual;
+  return `<div class="card">
+    <h2>${modoEdicionPlantilla ? 'Editar plantilla' : 'Nueva plantilla de tipo de programa'}</h2>
+    <div style="margin-bottom:16px;">
+      <label>Nombre del tipo de programa</label>
+      <input type="text" id="nombrePlantillaInput" value="${esc(plantillaActualNombre)}" placeholder="Ej: Programa de Altas Capacidades" ${modoEdicionPlantilla?'disabled':''}>
+    </div>
+    ${['metodologia','actividades','recursos','evaluacion'].map(campo=>{
+      const titulos = {metodologia:'Metodología a Utilizar', actividades:'Tipos de Actividades y Tareas', recursos:'Recursos Didácticos', evaluacion:'Instrumentos de Evaluación'};
+      return `<div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:14px;">
+        <label style="color:var(--azul);font-size:15px;">${titulos[campo]}</label>
+        <textarea rows="6" oninput="plantilla_actualizar('${campo}', this.value)">${esc(p[campo])}</textarea>
+      </div>`;
+    }).join('')}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-verde" onclick="guardarPlantilla()">💾 Guardar plantilla</button>
+      <button class="btn btn-gris" onclick="irVista('plantillas')">Cancelar</button>
+    </div>
+  </div>`;
+}
+function plantilla_actualizar(campo,valor){ plantillaActual[campo]=valor; }
+
+function guardarPlantilla(){
+  let nombre = modoEdicionPlantilla ? plantillaActualNombre : document.getElementById('nombrePlantillaInput').value.trim();
+  if(!nombre){ alert('Escribe el nombre del tipo de programa'); return; }
+  if(!modoEdicionPlantilla && plantillasPorTipoPrograma[nombre]){ alert('Ya existe una plantilla con ese nombre. Usa "Editar" en la lista si quieres modificarla.'); return; }
+  plantillasPorTipoPrograma[nombre] = { ...plantillaActual };
+  guardarPlantillas();
+  irVista('plantillas');
+}
+
+/* =========================================================
+   LISTAS
+========================================================= */
 function vistaListaProgramas(){
   if(programas.length===0){
     return `<div class="card"><h2>Programas Educativos</h2>
@@ -370,7 +641,7 @@ function vistaListaProgramas(){
           <h3>${esc(p.alumno)}<span class="badge badge-ini">${iniciales(p.alumno)}</span><span class="badge badge-azul">${esc(p.tipoPrograma)}</span></h3>
           <div class="meta">
             <div><strong>Asignatura:</strong> ${esc(p.asignatura)}</div>
-            <div><strong>Curso:</strong> ${esc(p.curso)}</div>
+            <div><strong>Curso:</strong> ${nombreCursoLegible(p.curso)}</div>
             <div><strong>Fecha:</strong> ${p.fecha||''}</div>
           </div>
         </div>
@@ -383,19 +654,36 @@ function vistaListaProgramas(){
 }
 
 function vistaListaRegistros(){
-  if(registros.length===0){
+  const pendientes = alumnosPendientesDeSeguimiento();
+  const avisoPendientes = pendientes.length === 0 ? '' : `
+    <div class="card" style="border-left:4px solid var(--rojo);">
+      <h2 style="margin-top:0;">Pendientes de seguimiento (${pendientes.length})</h2>
+      <p style="color:#6b7280;font-size:14px;margin-top:-10px;">Estos alumnos tienen un Programa Educativo pero todavía no tienen ningún Registro de Seguimiento.</p>
+      ${pendientes.map(p=>`
+        <div class="item-lista">
+          <div class="info">
+            <h3>${esc(p.alumno)}<span class="badge badge-ini">${iniciales(p.alumno)}</span><span class="badge badge-azul">${esc(p.tipoPrograma)}</span></h3>
+            <div class="meta"><div><strong>Curso:</strong> ${nombreCursoLegible(p.curso)}</div></div>
+          </div>
+          <div class="acciones">
+            <button class="btn btn-rojo" style="padding:6px 12px;font-size:13px;" onclick="nuevoRegistro('${esc(p.alumno).replace(/'/g,"\\'")}','${p.curso}')">＋ Crear seguimiento</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  if(registros.length===0 && pendientes.length===0){
     return `<div class="card"><h2>Registros de Seguimiento</h2>
       <div class="vacio"><p>No hay registros guardados</p>
       <button class="btn btn-rojo" onclick="nuevoRegistro()">Crear primer registro</button></div></div>`;
   }
-  return `<div class="card"><h2>Registros de Seguimiento</h2>` +
+  const listaRegistros = registros.length===0 ? '' : `<div class="card"><h2>Registros de Seguimiento</h2>` +
     registros.map((r,i)=>`
       <div class="item-lista">
         <div class="info">
           <h3>${esc(r.alumno)}<span class="badge badge-ini">${iniciales(r.alumno)}</span><span class="badge badge-rojo">${esc(r.programa)}</span></h3>
           <div class="meta">
             <div><strong>Área:</strong> ${esc(r.area)}</div>
-            <div><strong>Curso:</strong> ${esc(r.curso)}</div>
+            <div><strong>Curso:</strong> ${nombreCursoLegible(r.curso)}</div>
             <div><strong>Profesor:</strong> ${esc(r.profesor)}</div>
             <div><strong>Evaluación:</strong> ${esc(r.evaluacion)}</div>
             <div><strong>Fecha:</strong> ${r.fecha||''}</div>
@@ -407,20 +695,24 @@ function vistaListaRegistros(){
           <button class="btn-peq" title="Eliminar" onclick="eliminarRegistro(${i})">🗑️</button>
         </div>
       </div>`).join('') + `</div>`;
+
+  return avisoPendientes + listaRegistros;
 }
 
+/* =========================================================
+   FORMULARIOS
+========================================================= */
 function formPrograma(){
   const p = programaActual;
-  const opcionesTipo = ['Programa de Refuerzo NEAE Ed.Básica','Programa de Profundización','Programa de Enriquecimiento Curricular','Programa de Ampliación','Programa de Apoyo Educativo','Programa de Atención a la Diversidad','Programa Específico Personalizado'];
   return `
   <div class="card">
     <h2>${modoEdicion?'Editar':'Nuevo'} Programa Educativo</h2>
     <div class="grid">
       <div style="grid-column:span 2;">
         <label>Tipo de Programa</label>
-        <select onchange="p_actualizar('tipoPrograma', this.value)">
+        <select onchange="p_cambiarTipo(this.value)">
           <option value="">-- Selecciona tipo --</option>
-          ${opcionesTipo.map(o=>`<option value="${o}" ${p.tipoPrograma===o?'selected':''}>${o}</option>`).join('')}
+          ${programasTipo.map(o=>`<option value="${o}" ${p.tipoPrograma===o?'selected':''}>${o}</option>`).join('')}
           <option value="custom" ${p.tipoPrograma==='custom'?'selected':''}>Personalizado...</option>
         </select>
         ${p.tipoPrograma==='custom'?`<input type="text" style="margin-top:6px;" placeholder="Nombre del programa personalizado" value="${esc(p.tipoPersonalizado)}" oninput="p_actualizar('tipoPersonalizado', this.value)">`:''}
@@ -464,9 +756,21 @@ function formPrograma(){
   </div>`;
 }
 function p_actualizar(campo,valor){ programaActual[campo]=valor; render(); }
+function p_cambiarTipo(valor){
+  programaActual.tipoPrograma = valor;
+  const plantilla = plantillasPorTipoPrograma[valor];
+  if(plantilla && !modoEdicion){
+    programaActual.metodologia = plantilla.metodologia;
+    programaActual.actividades = plantilla.actividades;
+    programaActual.recursos = plantilla.recursos;
+    programaActual.evaluacion = plantilla.evaluacion;
+  }
+  render();
+}
 
 function formRegistro(){
   const r = registroActual;
+  const alumnosDisponibles = alumnosConProgramaEnCurso(r.curso);
   return `
   <div class="card">
     <h2>${modoEdicion?'Editar':'Nuevo'} Registro de Seguimiento</h2>
@@ -500,8 +804,9 @@ function formRegistro(){
         <label>Alumno</label>
         <select onchange="r_actualizar('alumno', this.value)" ${!r.curso?'disabled':''}>
           <option value="">Seleccionar alumno</option>
-          ${(alumnosPorCurso[r.curso]||[]).map(a=>`<option value="${esc(a)}" ${r.alumno===a?'selected':''}>${esc(a)}</option>`).join('')}
+          ${alumnosDisponibles.map(a=>`<option value="${esc(a)}" ${r.alumno===a?'selected':''}>${esc(a)}</option>`).join('')}
         </select>
+        ${r.curso && alumnosDisponibles.length===0 ? '<p style="color:#dc2626;font-size:12px;margin-top:4px;">Ningún alumno de este curso tiene todavía un Programa Educativo creado.</p>' : ''}
       </div>
       <div>
         <label>Evaluación</label>
@@ -544,14 +849,16 @@ function asp_eliminar(i){ registroActual.aspectos.splice(i,1); render(); }
 function agregarAspecto(){ registroActual.aspectos.push({titulo:'',contenido:''}); render(); }
 function restaurarAspectos(){ registroActual.aspectos = aspectosDefecto(); render(); }
 
+/* =========================================================
+   VISTA PREVIA
+========================================================= */
 function verPreviewRegistro(){
   const r = registroActual;
   if(!r.alumno || !r.area){ alert('Completa al menos alumno y área antes de la vista previa'); return; }
   mostrandoPreview = true; render();
 }
-function verPreviewPrograma(){
-  mostrandoPreview = true; render();
-}
+function verPreviewPrograma(){ mostrandoPreview = true; render(); }
+
 function previewRegistro(){
   const r = registroActual;
   const prog = r.programa==='Personalizado' ? r.programaPersonalizado : r.programa;
@@ -571,7 +878,7 @@ function previewRegistro(){
         ${filaTabla('ÁREA/MATERIA',r.area)}
         ${filaTabla('PROFESOR',r.profesor)}
         ${filaTabla('ALUMNO',r.alumno)}
-        ${filaTabla('CURSO',r.curso)}
+        ${filaTabla('CURSO',nombreCursoLegible(r.curso))}
         ${filaTabla('EVALUACIÓN',r.evaluacion)}
       </table>
       <h4>ASPECTOS A REVISAR</h4>
@@ -596,7 +903,7 @@ function previewPrograma(){
     <div style="border:1px solid var(--gris-200);padding:24px;">
       <h3 style="text-align:center;text-transform:uppercase;">${esc(tipo||'[Sin tipo]')}</h3>
       <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-        ${filaTabla('ALUMNO',p.alumno)} ${filaTabla('CURSO',p.curso)} ${filaTabla('ASIGNATURA',p.asignatura)}
+        ${filaTabla('ALUMNO',p.alumno)} ${filaTabla('CURSO',nombreCursoLegible(p.curso))} ${filaTabla('ASIGNATURA',p.asignatura)}
       </table>
       ${['metodologia','actividades','recursos','evaluacion'].map(c=>{
         const titulos = {metodologia:'METODOLOGÍA', actividades:'ACTIVIDADES Y TAREAS', recursos:'RECURSOS DIDÁCTICOS', evaluacion:'INSTRUMENTOS DE EVALUACIÓN'};
@@ -607,6 +914,9 @@ function previewPrograma(){
 }
 function filaTabla(k,v){ return `<tr><td style="border:1px solid #000;padding:6px;background:#f3f4f6;font-weight:bold;width:25%;">${k}:</td><td style="border:1px solid #000;padding:6px;">${esc(v)||'[Sin especificar]'}</td></tr>`; }
 
+/* =========================================================
+   GUARDAR / EDITAR / ELIMINAR
+========================================================= */
 function guardarRegistro(){
   const r = registroActual;
   if(!r.alumno || !r.area){ alert('Completa al menos alumno y área'); return; }
@@ -667,6 +977,9 @@ function eliminarPrograma(i){
   else { programas.splice(i,1); guardarColeccion('programas', programas); render(); }
 }
 
+/* =========================================================
+   EXPORTAR
+========================================================= */
 function descargarHTML(nombreArchivo, contenido){
   const blob = new Blob([contenido], {type:'text/html;charset=utf-8'});
   const url = URL.createObjectURL(blob);
@@ -674,6 +987,7 @@ function descargarHTML(nombreArchivo, contenido){
   a.href=url; a.download=nombreArchivo+'.html'; document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
+
 function exportarRegistroPDF(i){
   const r = registros[i];
   const ini = iniciales(r.alumno);
@@ -687,13 +1001,21 @@ function exportarRegistroPDF(i){
   <div class="header"><div class="logo">salesianos<br><small>TRIANA</small></div><div><strong>Colegio San Pedro</strong></div></div>
   <h2 style="text-align:center;">REGISTRO DE SEGUIMIENTO</h2>
   <p style="text-align:center;color:#dc2626;font-weight:bold;">${esc(r.programa)}</p>
-  <table>${filaTabla('ÁREA/MATERIA',r.area)}${filaTabla('PROFESOR',r.profesor)}${filaTabla('ALUMNO',r.alumno)}${filaTabla('CURSO',r.curso)}${filaTabla('EVALUACIÓN',r.evaluacion)}${filaTabla('FECHA',r.fecha)}</table>
+  <table>${filaTabla('ÁREA/MATERIA',r.area)}${filaTabla('PROFESOR',r.profesor)}${filaTabla('ALUMNO',r.alumno)}${filaTabla('CURSO',nombreCursoLegible(r.curso))}${filaTabla('EVALUACIÓN',r.evaluacion)}${filaTabla('FECHA',r.fecha)}</table>
   <h3>ASPECTOS A REVISAR</h3>
   <table>${r.aspectos.map(a=>`<tr><td class="tit">${esc(a.titulo)}</td><td>${esc(a.contenido)}</td></tr>`).join('')}</table>
   <p style="text-align:center;margin-top:30px;font-size:9px;color:#6b7280;">COLEGIO SAN PEDRO - SALESIANOS TRIANA<br>C/ CONDES DE BUSTILLO 17 | 41010 SEVILLA</p>
   </body></html>`;
-  descargarHTML(nombreArchivo, html);
+
+  if(GOOGLE_DRIVE_ACTIVADO && driveListo){
+    subirArchivoADrive(nombreArchivo, html, r.curso, r.alumno).then(ok=>{
+      if(ok) alert('Registro guardado en Drive: ' + CARPETA_RAIZ_DRIVE + '/' + nombreCursoLegible(r.curso) + '/' + iniciales(r.alumno) + '_' + primerTrozo(r.alumno) + '/');
+    });
+  } else {
+    descargarHTML(nombreArchivo, html);
+  }
 }
+
 function exportarProgramaPDF(i){
   const p = programas[i];
   const ini = iniciales(p.alumno);
@@ -708,14 +1030,22 @@ function exportarProgramaPDF(i){
   </style></head><body>
   <div class="header"><div class="logo">salesianos<br><small>TRIANA</small></div><div><strong>Colegio San Pedro</strong></div></div>
   <h2 style="text-align:center;">${esc(p.tipoPrograma)}</h2>
-  <table><tr><td style="font-weight:bold;width:25%;">ALUMNO:</td><td>${esc(p.alumno)}</td></tr><tr><td style="font-weight:bold;">CURSO:</td><td>${esc(p.curso)}</td></tr><tr><td style="font-weight:bold;">ASIGNATURA:</td><td>${esc(p.asignatura)}</td></tr></table>
+  <table><tr><td style="font-weight:bold;width:25%;">ALUMNO:</td><td>${esc(p.alumno)}</td></tr><tr><td style="font-weight:bold;">CURSO:</td><td>${nombreCursoLegible(p.curso)}</td></tr><tr><td style="font-weight:bold;">ASIGNATURA:</td><td>${esc(p.asignatura)}</td></tr></table>
   ${Object.keys(secciones).map(k=>`<div class="st">${secciones[k]}</div><div class="sc">${esc(p[k]).replace(/\n/g,'<br>')}</div><br>`).join('')}
   <p style="text-align:center;margin-top:30px;font-size:9px;color:#6b7280;">COLEGIO SAN PEDRO - SALESIANOS TRIANA<br>C/ CONDES DE BUSTILLO 17 | 41010 SEVILLA</p>
   </body></html>`;
-  descargarHTML(nombreArchivo, html);
+
+  if(GOOGLE_DRIVE_ACTIVADO && driveListo){
+    subirArchivoADrive(nombreArchivo, html, p.curso, p.alumno).then(ok=>{
+      if(ok) alert('Programa guardado en Drive: ' + CARPETA_RAIZ_DRIVE + '/' + nombreCursoLegible(p.curso) + '/' + iniciales(p.alumno) + '_' + primerTrozo(p.alumno) + '/');
+    });
+  } else {
+    descargarHTML(nombreArchivo, html);
+  }
 }
 
 iniciarApp();
+iniciarGoogleDrive();
 </script>
 </body>
 </html>
