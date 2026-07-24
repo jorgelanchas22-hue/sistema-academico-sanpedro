@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Académico San Pedro - Salesianos Triana</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<style>
+  :root{
+    --rojo:#dc2626; --rojo-oscuro:#b91c1c; --azul:#2563eb; --azul-oscuro:#1d4ed8;
+    --gris-100:#f3f4f6; --gris-200:#e5e7eb; --gris-300:#d1d5db; --gris-600:#4b5563; --gris-800:#1f2937;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f9fafb;color:#1f2937;}
+  .oculto{display:none !important;}
+
+  header{background:#fff;border-bottom:4px solid var(--rojo);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  header .logo{color:var(--rojo);font-weight:bold;font-size:22px;line-height:1.1;}
+  header .logo span{font-size:13px;font-weight:normal;display:block;}
+  header .titulo{font-size:18px;font-weight:600;color:#1f2937;}
+  .estado{font-size:12px;padding:4px 10px;border-radius:999px;}
+  .estado.demo{background:#fef3c7;color:#92400e;}
+  .estado.online{background:#d1fae5;color:#065f46;}
+
+  main{max-width:1100px;margin:0 auto;padding:24px;}
+
+  nav{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px;}
+  nav button{padding:10px 16px;border-radius:8px;border:1px solid var(--gris-300);background:#fff;cursor:pointer;font-size:14px;font-weight:500;}
+  nav button.activo-azul{background:var(--azul);color:#fff;border-color:var(--azul);}
+  nav button.activo-rojo{background:var(--rojo);color:#fff;border-color:var(--rojo);}
+  nav button.activo-verde{background:#059669;color:#fff;border-color:#059669;}
+
+  .card{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:24px;margin-bottom:20px;}
+  .card h2{margin-top:0;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;}
+  label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;}
+  select,input[type=text],textarea{width:100%;padding:9px;border:1px solid var(--gris-300);border-radius:6px;font-size:14px;font-family:inherit;}
+  textarea{resize:vertical;}
+
+  .btn{padding:9px 18px;border-radius:8px;border:none;font-weight:600;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:6px;}
+  .btn-rojo{background:var(--rojo);color:#fff;} .btn-rojo:hover{background:var(--rojo-oscuro);}
+  .btn-azul{background:var(--azul);color:#fff;} .btn-azul:hover{background:var(--azul-oscuro);}
+  .btn-gris{background:var(--gris-200);color:#374151;}
+  .btn-verde{background:#059669;color:#fff;}
+  .btn-peq{padding:6px 10px;border-radius:6px;border:none;background:none;cursor:pointer;}
+  .btn-peq:hover{background:var(--gris-100);}
+
+  .item-lista{border:1px solid var(--gris-200);border-radius:8px;padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .item-lista .info h3{margin:0 0 6px;font-size:16px;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;margin-left:6px;}
+  .badge-ini{background:var(--gris-100);color:#374151;font-family:monospace;}
+  .badge-rojo{background:#fee2e2;color:#991b1b;}
+  .badge-azul{background:#dbeafe;color:#1e40af;}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;font-size:13px;color:#4b5563;margin-top:6px;}
+  .acciones{display:flex;gap:4px;align-items:flex-start;}
+
+  .aspecto{border:1px solid var(--gris-200);border-radius:8px;padding:14px;margin-bottom:12px;}
+  .aspecto-cabecera{display:flex;gap:8px;margin-bottom:8px;}
+  .aspecto-cabecera input{border:none;border-bottom:1px solid var(--gris-300);font-weight:600;padding:4px 0;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px;}
+  .stat{border-radius:10px;padding:20px;text-align:center;}
+  .stat .n{font-size:28px;font-weight:bold;}
+  .stat.rojo{background:#fef2f2;color:var(--rojo);} .stat.azul{background:#eff6ff;color:var(--azul);}
+  .stat.verde{background:#ecfdf5;color:#059669;} .stat.morado{background:#f5f3ff;color:#7c3aed;}
+
+  .vacio{text-align:center;padding:40px;color:#9ca3af;}
+  .nota{border-left:4px solid var(--azul);background:#eff6ff;padding:10px 14px;border-radius:6px;font-size:13px;color:#1e40af;margin-bottom:14px;}
+  footer{text-align:center;color:#fff;background:#1f2937;padding:16px;font-size:12px;margin-top:30px;}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div class="logo">salesianos<span>TRIANA</span></div>
+      <div class="titulo">Sistema Académico Integral - San Pedro</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span id="estadoConexion" class="estado demo">Modo demo (sin Firebase)</span>
+    </div>
+  </header>
+
+  <main>
+    <nav>
+      <button id="navProgramas" onclick="irVista('programas')">📚 Programas Educativos</button>
+      <button id="navRegistros" onclick="irVista('registros')">📋 Registros de Seguimiento</button>
+      <button id="navNuevoPrograma" onclick="nuevoPrograma()">＋ Nuevo Programa</button>
+      <button id="navNuevoRegistro" onclick="nuevoRegistro()">＋ Nuevo Registro</button>
+      <button id="navAlumnos" onclick="irVista('alumnos')">🎓 Gestión de Alumnos</button>
+      <button id="navDashboard" onclick="irVista('dashboard')">📊 Dashboard</button>
+    </nav>
+
+    <div id="contenido"></div>
+  </main>
+
+  <footer>C/ CONDES DE BUSTILLO 17 | 41010 SEVILLA | T 954 331 488 | https://triana.salesianos.edu</footer>
+</div>
+
+<script>
+const firebaseConfig = {
+  // apiKey: "...",
+  // authDomain: "...",
+  // databaseURL: "https://TU-PROYECTO-default-rtdb.europe-west1.firebasedatabase.app",
+  // projectId: "...",
+};
+
+let db = null;
+let modoFirebase = false;
+try {
+  if (firebaseConfig.databaseURL) {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    modoFirebase = true;
+  }
+} catch(e){ console.warn("Firebase no configurado, usando modo demo.", e); }
+
+/* ===================== ALUMNOS POR DEFECTO (carga inicial) ===================== */
+const alumnosPorCursoDefecto = {
+"1A":["Alejandro Álvarez García","María Benítez López","Carlos Cabrera Ruiz","Daniela Díaz Moreno","Eduardo Fernández Silva","Fátima González Torres","Gabriel Hernández Vega","Helena Jiménez Ramos","Iván López Martín","Julia Martínez Soto","Kevin Muñoz Herrera","Lucía Navarro Peña","Miguel Ortega Castro","Natalia Pérez Vázquez","Óscar Ramírez Jiménez","Paula Rodríguez Luna","Quique Sánchez Molina","Rosa Torres Aguilar","Sergio Vargas Medina","Teresa Vidal Romero"],
+"1B":["Ana Alonso Guerrero","Bruno Blanco Serrano","Carmen Calvo Iglesias","Diego Delgado Prieto","Elena Espinosa Núñez","Fernando Flores Castillo","Gracia García Domínguez","Hugo Herrera Gallego","Isabel Iglesias Morales","Javier Jiménez Fuentes","Lara López Benítez","Manuel Moreno Rubio","Nerea Navarro Campos","Omar Ortiz Valdés","Pilar Pascual Rivera","Raúl Ramos Cortés","Silvia Soto Herrero","Tomás Torres Bermejo","Úrsula Urrutia Leal","Víctor Vega Paredes"],
+"1C":["Adrián Antúnez Rojas","Beatriz Bernal Suárez","Cristian Cruz Santana","Diana Durán Polo","Emilio Estévez Quintero","Francisca Franco León","Gonzalo Gallardo Mesa","Heidi Hurtado Blázquez","Ignacio Izquierdo Valle","Jazmín Jiménez Cano","Luis Luna Cordero","Marta Méndez Parra","Nicolás Nieto Carmona","Olivia Ocaña Reyes","Pablo Pedraza Montero","Queralt Quintana Losada","Rodrigo Rueda Bermúdez","Sandra Sala Villar","Tadeo Tejedor Moral","Valeria Vallejo Santos"],
+"2A":["Alcántara Cruz, Candela","Arenas Bellido, Gonzalo","Campos García, Olivia","Castillo Iglesias, Ángela","Castro Palacios, Daniel","Estrella Eliot, Melanie Ximena","Fernández de Moya Vallana, Clara de Asís","Gallego Caballero, Amelia","Gaviño Ramírez, Pablo","Guerra García, Manuel","Herrera León, Ana","Jiménez Vázquez, Manuel","Lamet Correa, Candela","León García, Mercedes","Limón Gómez, Laura","López Giménez de Aragón, Francisco","López Guzmán, Paola Alejandra","Maldonado Vallejos, Nahiara Monserrat","Martín Valle, Javier","Matas Puntas, Javier","Menéndez Bermeo, Franchesca","Molina Pedrós, Marta","Moreno Grove, Irene","Moreno Santiago, Luis","Moreno Urquiza, Iris","Munar González, Claudio","Muñoz Martín, Pedro","Paredes Chacón, Juan Luis","Perales Martín, Gonzalo","Peralvo De la Rosa, Nerea"],
+"2B":["Álvarez Paisano, José Antonio","Barroso Sánchez, Triana","Borrego Martín, Manuel","Collantes de Terán Reina, Cristina","Del Val Cordero, Esperanza","Fernández Ocaña, Fernando","Ferrer Ramírez, Mario","Gallardo Sempere, Inés","García Guerra, Sandra","García Polonsky, Julia","León Carmona, Agustín","López Morato, Ana","Luque Peña, Ernesto","Luza Hidalgo, Martina","Martínez Fernández, Noelia del Valle","Maya Rendón, Juan José","Medina Villén, Inmaculada","Méndez Delgado, Eric","Núñez Gil, Javier","Pulido Leñador, Carlos","Romero Gallú, Lucía","Saavedra Plaza, Lucía","Sánchez Cansino, José Manuel","Sevilla Amores, Carmen","Soriano Pedreira, Álvaro","Suárez Iturri, Sebastián Isaías","Suárez Martínez, Isaac","Torilo Cordón, Víctor","Vilalta Gómez, Guillermo","Wandelmer Salado, María Luisa"],
+"2C":["Ávila Olmo, Esperanza Triana","Cid Quidiello, Alejandro","Cuevas Espí, Manuel","De Alba Machado, Sara","Delgado De la Vega, Carmen","Delgado De la Vega, Juan Manuel","Dorantes González, Rodrigo","Gutiérrez Ortega, Telma Carolina","Iglesias López, Pablo Reyes","Machuca Ramos, Ángela","Márquez Barbacid, Sara","Mengual Saborido, Antonio José","Ojeda Romero, Lola","Palomino Dopazo, Carlos","Peregrín Colmena, Paula","Piña González, Francisco Javier","Piruat Muñoz, Cristina","Ramos Guerra, Pablo","Rodríguez López, Álvaro","Rodríguez Mora, Álvaro","Rodríguez Villaseñor, Marta","Román Cruz, Ángela","Rubio Frauca, Ana","Rubio Frauca, Rafael","Ruiz Prieto, Emilio","Sánchez Pérez, Francisco Manuel","Segura Molina, Manuel","Torres Estrémé, Chloé","Vargas Barrientos, Manuel","Vázquez Méndez, Ángel Luis"],
+"3A":["Alba Aguirre Montoya","Benjamín Bustos Salinas","Carla Carrasco Hidalgo","David Delgado Espinoza","Emma Escudero Vargas","Felipe Fuentes Ortega","Gisela Guzmán Palma","Héctor Herrera Sandoval","Inés Ibarra Muñoz","Joaquín Jiménez Ríos","Lorena López Aguilar","Mateo Morales Vega","Nadia Navarro Peña","Orlando Ortega Ramos","Paloma Pacheco Silva","Rubén Ramírez Tovar","Sofía Sánchez Molina","Tomás Torres Cruz","Ursula Ulloa Bermúdez","Vicente Vásquez Herrera"],
+"3B":["Andrea Arellano Castro","Bruno Barrios Medina","Claudia Contreras Soto","Diego Domínguez Valle","Estefanía Estrada Moreno","Francisco Flores Luna","Gabriela García Peña","Hernán Herrera Silva","Isabella Iglesias Ramos","Jorge Jiménez Vega","Karina López Torres","Leonardo Martínez Aguilar","Mónica Muñoz Castillo","Nicolás Núñez Herrera","Ofelia Ortiz Valdés","Pedro Pérez Morales","Regina Ramírez Santos","Santiago Soto Guerrero","Tamara Torres Méndez","Ulises Urrutia Campos"],
+"3C":["Alejandra Alvarado Ruiz","Bernardo Bravo Jiménez","Camila Cabrera Sánchez","Daniel Díaz Herrera","Esperanza Espinoza López","Fabián Fuentes Silva","Gloria González Torres","Hugo Hernández Vega","Irene Ibáñez Moreno","Julián Jiménez Castro","Karla Lara Aguilar","Marcelo Martín Peña","Natasha Navarro Ríos","Octavio Ortega Silva","Patricia Pérez Vásquez","Rodrigo Ramos Herrera","Susana Sánchez Morales","Teodoro Torres Aguilar","Ximena Vega Castillo","Yolanda Vargas Méndez"],
+"4A":["Aldea Martín, Sofía","Arancón Ramos, Ángela","Balbontín Martínez, Álvaro","Benítez Fernández, Pablo","Benítez Marín, Antonio","Biedma Garrido, Alejandro","Biedma Garrido, Beatriz","Bonilla Gómez, Javier","Bracero Rodríguez, Darío","Cadenas Sarmiento, María de las Mercedes","Calvarro Luque, Alejandro","Camacho Delgado, Claudia","Campuzano García, Gonzalo","Carvajal Delgado, Victoria","Chen, Yi Qian","Cortés Casado, Rodrigo","Cruz Álvarez, Jacqueline","Del Águila Merino, María","Díaz Ponce de León, Fernando","Escobar Velázquez, Paula","Esquinas De la Torre, Mario","Fernández Román, Álvaro","Gutiérrez Guillén, Pablo","Hurtado Valero, Sergio","Liger García, Estrella","Loaiza Torres, Alicia del Rocío","López López, Francisco de Asís","Martín Salas, Inmaculada","Mejía Zeledon, Reina Triana","Molina García, Blanca","Palmero Rodríguez, Álvaro","Roas Alonso, Sara","Ruesga Velasco, Juan Pablo","Tejero Rocha, Victoria","Troya Díaz, Laura"],
+"4B":["Ángel Ibáñez, Nicolás","Báez Cardinali, Lucía","Brenes Gutiérrez, Ana","Brenes Puelles, Miguel","Bueno González, Paula","Cabrera Fernández, Daniel","Carmona Jiménez, Jazmine","Crespo Rosa, Daniela","Dorado López, Esperanza","Flores Villegas, Jaime","García Porcel, Álvaro Mateo","García Soto, Jesús José","Gener Amador, Ángela","Holgado Guzmán, Ana","Hurtado Díaz, Sara","Iglesias Núñez, Estervina","Mengual Saborido, Carla","Millán Alzate, Hannah","Munar González, Antonio Jesús","Pitot Valerio, Héctor Alejandro","Rosa González, Jaime","Ruiz De la Bandera, Coral","Sánchez Bernal, Darío","Sánchez Campos, Pastora","Sánchez Vera, Nora","Soriano Pedreira, Sergio"],
+"4C":["Cobos Vázquez, Diego","Franco Pérez, Arancha","Gaviño Ramírez, Francisco","Gómez Sánchez, Paula","Gordillo Ramos-Catalina, María","Gutiérrez Reina, Rocío del Mar","Hernández Meléndez, José Luis","Holgado Guzmán, Isabel","León Carmona, Tomás","León Girón, Carlos","Moreno Matas, Alicia","Ocaña Serrano, Francisco Javier","Peñalosa Torrens, Raquel","Pérez Reyes, Paula","Pozas Ruiz, Lucas","Pulido Leñador, Claudia","Ramos Andrés, Rodrigo","Ribera Villarreal, José Andrés","Ríos Iglesias, Carlos","Rodríguez González, Gonzalo","Romero Bernal, Simón","Rueda Carranza, Julia","Salinas Bejarano, Daniel","Sanchís Romero, María del Pilar","Vera Vázquez, Carmen","Villamayor Barreto, Selena","Wang, Tiantian","Xia, Shuyao"]
+};
+
+let alumnosPorCurso = {};
+const cursos = Object.keys(alumnosPorCursoDefecto);
+
+const asignaturas = ['Lengua Castellana y Literatura','Matemáticas','Geografía e Historia','Biología y Geología','Física y Química','Inglés','Francés','Educación Física','Tecnología','Música','Educación Plástica Visual y Audiovisual','Religión/Valores Éticos','Latín','Economía','Filosofía','Iniciación a la Actividad Emprendedora','Segunda Lengua Extranjera','Cultura Clásica'];
+
+const programasTipo = ['Programa de Profundización','Programa de Refuerzo Educativo','Programa de Diversificación','Programa de Mejora del Aprendizaje','Programa de Altas Capacidades','Programa de Necesidades Educativas Especiales','Programa de Refuerzo NEAE Ed.Básica','Programa de Enriquecimiento Curricular','Programa de Ampliación','Programa de Apoyo Educativo','Programa de Atención a la Diversidad','Programa Específico Personalizado'];
+
+const aspectosDefecto = () => ([
+  {titulo:'Eficacia de las medidas', contenido:'La eficacia ha sido positiva ya que las medidas adoptadas en su momento han servido para que el alumno obtenga los objetivos previamente planteados y estipulados para su consecución.'},
+  {titulo:'Metodología, materiales...', contenido:'Se ha adaptado en tiempo y en ejecución las pruebas. Además, se ha hecho un seguimiento individualizado para comprobar la eficacia de las medidas adoptadas.'},
+  {titulo:'Temporalización', contenido:'A lo largo del trimestre, a través de un seguimiento exhaustivo y un compromiso con el alumno.'},
+  {titulo:'Acuerdos-Sugerencias de cara al próximo trimestre', contenido:'Mantener el mismo ritmo y adaptar los contenidos de manera más profunda en caso de que sea necesario.'}
+]);
+
+const programaDefecto = () => ({
+  metodologia:'Metodología activa y participativa, adaptada a los ritmos y estilos de aprendizaje del alumnado, con atención personalizada y refuerzo de la autoestima.',
+  actividades:'Explicaciones adaptadas, organizadores gráficos, trabajo cooperativo, tutorización entre iguales, actividades progresivas y feedback constante.',
+  recursos:'Ubicación preferente en el aula, materiales adaptados (textos, esquemas, recursos digitales), coordinación con el departamento de orientación y las familias.',
+  evaluacion:'Adaptación de pruebas escritas (tiempo, formato), evaluación continua con mayor peso (70%), rúbricas adaptadas y valoración del progreso individual.'
+});
+
+let registros = [];
+let programas = [];
+let vista = 'programas';
+let modoEdicion = false;
+let mostrandoPreview = false;
+let registroActual = null;
+let programaActual = null;
+let cursoSeleccionadoGestion = cursos[0] || '';
+
+function iniciarApp(){
+  document.getElementById('estadoConexion').textContent = modoFirebase ? 'Conectado a Firebase' : 'Modo demo (local)';
+  document.getElementById('estadoConexion').className = 'estado ' + (modoFirebase ? 'online' : 'demo');
+
+  if(modoFirebase){
+    db.ref('registros').on('value', snap=>{ registros = objAArray(snap.val()); if(vista==='registros'||vista==='dashboard') render(); });
+    db.ref('programas').on('value', snap=>{ programas = objAArray(snap.val()); if(vista==='programas'||vista==='dashboard') render(); });
+    db.ref('alumnos').once('value', snap=>{
+      if(snap.val()){ alumnosPorCurso = snap.val(); }
+      else { alumnosPorCurso = alumnosPorCursoDefecto; db.ref('alumnos').set(alumnosPorCurso); }
+      db.ref('alumnos').on('value', s=>{ alumnosPorCurso = s.val()||{}; if(vista==='alumnos') render(); });
+      render();
+    });
+  } else {
+    registros = JSON.parse(localStorage.getItem('sanpedro_registros')||'[]');
+    programas = JSON.parse(localStorage.getItem('sanpedro_programas')||'[]');
+    const guardados = localStorage.getItem('sanpedro_alumnos');
+    alumnosPorCurso = guardados ? JSON.parse(guardados) : alumnosPorCursoDefecto;
+    render();
+  }
+}
+function objAArray(obj){
+  if(!obj) return [];
+  return Object.keys(obj).map(k=>({...obj[k], _key:k}));
+}
+function guardarColeccion(nombre, arr){
+  if(!modoFirebase){
+    localStorage.setItem('sanpedro_'+nombre, JSON.stringify(arr));
+  }
+}
+function guardarAlumnos(){
+  if(modoFirebase){
+    db.ref('alumnos').set(alumnosPorCurso);
+  } else {
+    localStorage.setItem('sanpedro_alumnos', JSON.stringify(alumnosPorCurso));
+  }
+}
+
+function iniciales(nombre){
+  if(!nombre) return 'SA';
+  const partes = nombre.trim().split(/[\s,]+/).filter(Boolean);
+  return partes.slice(0,4).map(p=>p.charAt(0).toUpperCase()).join('') || 'SA';
+}
+function primerTrozo(nombre){
+  return nombre.split(',')[0]?.trim() || nombre.split(' ')[0];
+}
+function nombreCursoLegible(c){
+  return c + ' ESO';
+}
+function esc(s){ return (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function irVista(v){ vista=v; mostrandoPreview=false; render(); }
+function nuevoRegistro(){
+  modoEdicion=false; mostrandoPreview=false;
+  registroActual = { id:null, programa:programasTipo[0], programaPersonalizado:'', area:'', profesor:'', alumno:'', curso:'', evaluacion:'', aspectos:aspectosDefecto() };
+  vista='formRegistro'; render();
+}
+function nuevoPrograma(){
+  modoEdicion=false;
+  const base = programaDefecto();
+  programaActual = { id:null, tipoPrograma:'', tipoPersonalizado:'', curso:'', alumno:'', asignatura:'', ...base };
+  vista='formPrograma'; render();
+}
+
+function render(){
+  document.querySelectorAll('nav button').forEach(b=>b.className='');
+  const mapa = {programas:'navProgramas', registros:'navRegistros', dashboard:'navDashboard', formPrograma:'navNuevoPrograma', formRegistro:'navNuevoRegistro', alumnos:'navAlumnos'};
+  const colores = {navProgramas:'activo-azul', navRegistros:'activo-rojo', navDashboard:'activo-verde', navNuevoPrograma:'activo-azul', navNuevoRegistro:'activo-rojo', navAlumnos:'activo-verde'};
+  const activoId = mapa[vista];
+  if(activoId) document.getElementById(activoId).className = colores[activoId];
+
+  const cont = document.getElementById('contenido');
+  if(vista==='programas') cont.innerHTML = vistaListaProgramas();
+  else if(vista==='registros') cont.innerHTML = vistaListaRegistros();
+  else if(vista==='dashboard') cont.innerHTML = vistaDashboard();
+  else if(vista==='alumnos') cont.innerHTML = vistaGestionAlumnos();
+  else if(vista==='formPrograma') cont.innerHTML = mostrandoPreview ? previewPrograma() : formPrograma();
+  else if(vista==='formRegistro') cont.innerHTML = mostrandoPreview ? previewRegistro() : formRegistro();
+}
+
+function vistaDashboard(){
+  const totalAlumnos = Object.values(alumnosPorCurso).reduce((t,a)=>t+a.length,0);
+  return `
+  <div class="card">
+    <h2>Dashboard</h2>
+    <div class="stats">
+      <div class="stat rojo"><div class="n">${registros.length}</div>Registros de Seguimiento</div>
+      <div class="stat azul"><div class="n">${programas.length}</div>Programas Educativos</div>
+      <div class="stat verde"><div class="n">${totalAlumnos}</div>Total Alumnos</div>
+      <div class="stat morado"><div class="n">${cursos.length}</div>Cursos Disponibles</div>
+    </div>
+  </div>`;
+}
+
+/* ===================== GESTIÓN DE ALUMNOS ===================== */
+function vistaGestionAlumnos(){
+  return `
+  <div class="card">
+    <h2>Gestión de Alumnos</h2>
+    <div class="grid" style="grid-template-columns: 1fr 2fr;">
+      <div>
+        <label>Curso</label>
+        <select onchange="cambiarCursoGestion(this.value)">
+          ${cursos.map(c=>`<option value="${c}" ${c===cursoSeleccionadoGestion?'selected':''}>${nombreCursoLegible(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Añadir alumno a ${nombreCursoLegible(cursoSeleccionadoGestion)}</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="nuevoAlumnoInput" placeholder="Nombre completo del alumno">
+          <button class="btn btn-verde" onclick="añadirAlumno()">＋ Añadir</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="nota">Curso: <strong>${nombreCursoLegible(cursoSeleccionadoGestion)}</strong> — ${(alumnosPorCurso[cursoSeleccionadoGestion]||[]).length} alumnos</div>
+
+    <div style="max-height:400px;overflow-y:auto;">
+      ${(alumnosPorCurso[cursoSeleccionadoGestion]||[]).map((a,i)=>`
+        <div class="item-lista" style="padding:10px 16px;">
+          <div class="info"><strong>${esc(a)}</strong></div>
+          <div class="acciones">
+            <button class="btn-peq" title="Eliminar" onclick="eliminarAlumno(${i})">🗑️</button>
+          </div>
+        </div>`).join('') || '<p style="color:#9ca3af;">No hay alumnos en este curso todavía.</p>'}
+    </div>
+  </div>`;
+}
+
+function cambiarCursoGestion(curso){
+  cursoSeleccionadoGestion = curso;
+  render();
+}
+
+function añadirAlumno(){
+  const input = document.getElementById('nuevoAlumnoInput');
+  const nombre = input.value.trim();
+  if(!nombre){ alert('Escribe el nombre del alumno'); return; }
+  if(!alumnosPorCurso[cursoSeleccionadoGestion]) alumnosPorCurso[cursoSeleccionadoGestion] = [];
+  alumnosPorCurso[cursoSeleccionadoGestion].push(nombre);
+  alumnosPorCurso[cursoSeleccionadoGestion].sort((a,b)=>a.localeCompare(b,'es'));
+  guardarAlumnos();
+  render();
+}
+
+function eliminarAlumno(i){
+  if(!confirm('¿Eliminar este alumno de la lista? (No borra sus registros o programas ya creados)')) return;
+  alumnosPorCurso[cursoSeleccionadoGestion].splice(i,1);
+  guardarAlumnos();
+  render();
+}
+
+/* ===================== LISTAS ===================== */
+function vistaListaProgramas(){
+  if(programas.length===0){
+    return `<div class="card"><h2>Programas Educativos</h2>
+      <div class="vacio"><p>No hay programas educativos guardados</p>
+      <button class="btn btn-azul" onclick="nuevoPrograma()">Crear primer programa</button></div></div>`;
+  }
+  return `<div class="card"><h2>Programas Educativos</h2>` +
+    programas.map((p,i)=>`
+      <div class="item-lista">
+        <div class="info">
+          <h3>${esc(p.alumno)}<span class="badge badge-ini">${iniciales(p.alumno)}</span><span class="badge badge-azul">${esc(p.tipoPrograma)}</span></h3>
+          <div class="meta">
+            <div><strong>Asignatura:</strong> ${esc(p.asignatura)}</div>
+            <div><strong>Curso:</strong> ${esc(p.curso)}</div>
+            <div><strong>Fecha:</strong> ${p.fecha||''}</div>
+          </div>
+        </div>
+        <div class="acciones">
+          <button class="btn-peq" title="Editar" onclick="editarPrograma(${i})">✏️</button>
+          <button class="btn-peq" title="Exportar" onclick="exportarProgramaPDF(${i})">⬇️</button>
+          <button class="btn-peq" title="Eliminar" onclick="eliminarPrograma(${i})">🗑️</button>
+        </div>
+      </div>`).join('') + `</div>`;
+}
+
+function vistaListaRegistros(){
+  if(registros.length===0){
+    return `<div class="card"><h2>Registros de Seguimiento</h2>
+      <div class="vacio"><p>No hay registros guardados</p>
+      <button class="btn btn-rojo" onclick="nuevoRegistro()">Crear primer registro</button></div></div>`;
+  }
+  return `<div class="card"><h2>Registros de Seguimiento</h2>` +
+    registros.map((r,i)=>`
+      <div class="item-lista">
+        <div class="info">
+          <h3>${esc(r.alumno)}<span class="badge badge-ini">${iniciales(r.alumno)}</span><span class="badge badge-rojo">${esc(r.programa)}</span></h3>
+          <div class="meta">
+            <div><strong>Área:</strong> ${esc(r.area)}</div>
+            <div><strong>Curso:</strong> ${esc(r.curso)}</div>
+            <div><strong>Profesor:</strong> ${esc(r.profesor)}</div>
+            <div><strong>Evaluación:</strong> ${esc(r.evaluacion)}</div>
+            <div><strong>Fecha:</strong> ${r.fecha||''}</div>
+          </div>
+        </div>
+        <div class="acciones">
+          <button class="btn-peq" title="Editar" onclick="editarRegistro(${i})">✏️</button>
+          <button class="btn-peq" title="Exportar" onclick="exportarRegistroPDF(${i})">⬇️</button>
+          <button class="btn-peq" title="Eliminar" onclick="eliminarRegistro(${i})">🗑️</button>
+        </div>
+      </div>`).join('') + `</div>`;
+}
+
+/* ===================== FORMULARIOS ===================== */
+function formPrograma(){
+  const p = programaActual;
+  const opcionesTipo = ['Programa de Refuerzo NEAE Ed.Básica','Programa de Profundización','Programa de Enriquecimiento Curricular','Programa de Ampliación','Programa de Apoyo Educativo','Programa de Atención a la Diversidad','Programa Específico Personalizado'];
+  return `
+  <div class="card">
+    <h2>${modoEdicion?'Editar':'Nuevo'} Programa Educativo</h2>
+    <div class="grid">
+      <div style="grid-column:span 2;">
+        <label>Tipo de Programa</label>
+        <select onchange="p_actualizar('tipoPrograma', this.value)">
+          <option value="">-- Selecciona tipo --</option>
+          ${opcionesTipo.map(o=>`<option value="${o}" ${p.tipoPrograma===o?'selected':''}>${o}</option>`).join('')}
+          <option value="custom" ${p.tipoPrograma==='custom'?'selected':''}>Personalizado...</option>
+        </select>
+        ${p.tipoPrograma==='custom'?`<input type="text" style="margin-top:6px;" placeholder="Nombre del programa personalizado" value="${esc(p.tipoPersonalizado)}" oninput="p_actualizar('tipoPersonalizado', this.value)">`:''}
+      </div>
+      <div>
+        <label>Curso</label>
+        <select onchange="p_actualizar('curso', this.value); p_actualizar('alumno','')">
+          <option value="">-- Selecciona curso --</option>
+          ${cursos.map(c=>`<option value="${c}" ${p.curso===c?'selected':''}>${nombreCursoLegible(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Alumno</label>
+        <select onchange="p_actualizar('alumno', this.value)" ${!p.curso?'disabled':''}>
+          <option value="">-- Selecciona alumno --</option>
+          ${(alumnosPorCurso[p.curso]||[]).map(a=>`<option value="${esc(a)}" ${p.alumno===a?'selected':''}>${esc(a)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Asignatura</label>
+        <select onchange="p_actualizar('asignatura', this.value)">
+          <option value="">-- Selecciona asignatura --</option>
+          ${asignaturas.map(a=>`<option value="${a}" ${p.asignatura===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    ${['metodologia','actividades','recursos','evaluacion'].map(campo=>{
+      const titulos = {metodologia:'Metodología a Utilizar', actividades:'Tipos de Actividades y Tareas', recursos:'Recursos Didácticos', evaluacion:'Instrumentos de Evaluación'};
+      return `<div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:14px;">
+        <label style="color:var(--azul);font-size:15px;">${titulos[campo]}</label>
+        <textarea rows="6" oninput="p_actualizar('${campo}', this.value)">${esc(p[campo])}</textarea>
+      </div>`;
+    }).join('')}
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-azul" onclick="verPreviewPrograma()">👁 Vista Previa</button>
+      <button class="btn btn-verde" onclick="guardarPrograma()">💾 ${modoEdicion?'Actualizar':'Guardar'}</button>
+      <button class="btn btn-gris" onclick="irVista('programas')">Cancelar</button>
+    </div>
+  </div>`;
+}
+function p_actualizar(campo,valor){ programaActual[campo]=valor; render(); }
+
+function formRegistro(){
+  const r = registroActual;
+  return `
+  <div class="card">
+    <h2>${modoEdicion?'Editar':'Nuevo'} Registro de Seguimiento</h2>
+    <div class="grid">
+      <div style="grid-column:span 2;">
+        <label>Programa</label>
+        <select onchange="r_actualizar('programa', this.value)">
+          ${[...programasTipo,'Personalizado'].map(pr=>`<option value="${pr}" ${r.programa===pr?'selected':''}>${pr}</option>`).join('')}
+        </select>
+        ${r.programa==='Personalizado'?`<input type="text" style="margin-top:6px;" placeholder="Nombre del programa personalizado" value="${esc(r.programaPersonalizado)}" oninput="r_actualizar('programaPersonalizado', this.value)">`:''}
+      </div>
+      <div>
+        <label>Área/Materia</label>
+        <select onchange="r_actualizar('area', this.value)">
+          <option value="">Seleccionar asignatura</option>
+          ${asignaturas.map(a=>`<option value="${a}" ${r.area===a?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Profesor</label>
+        <input type="text" value="${esc(r.profesor)}" oninput="r_actualizar('profesor', this.value)" placeholder="Nombre del profesor">
+      </div>
+      <div>
+        <label>Curso</label>
+        <select onchange="r_actualizar('curso', this.value); r_actualizar('alumno','')">
+          <option value="">Seleccionar curso</option>
+          ${cursos.map(c=>`<option value="${c}" ${r.curso===c?'selected':''}>${nombreCursoLegible(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Alumno</label>
+        <select onchange="r_actualizar('alumno', this.value)" ${!r.curso?'disabled':''}>
+          <option value="">Seleccionar alumno</option>
+          ${(alumnosPorCurso[r.curso]||[]).map(a=>`<option value="${esc(a)}" ${r.alumno===a?'selected':''}>${esc(a)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Evaluación</label>
+        <select onchange="r_actualizar('evaluacion', this.value)">
+          <option value="">Seleccionar evaluación</option>
+          ${['Primera evaluación','Segunda evaluación','Tercera evaluación','Tercera-Final evaluación','Evaluación extraordinaria'].map(e=>`<option value="${e}" ${r.evaluacion===e?'selected':''}>${e}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">Aspectos a Revisar</h3>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-azul" style="padding:6px 12px;font-size:13px;" onclick="restaurarAspectos()">Restaurar Plantilla</button>
+        <button class="btn btn-verde" style="padding:6px 12px;font-size:13px;" onclick="agregarAspecto()">＋ Agregar</button>
+      </div>
+    </div>
+    <div class="nota">📁 Los archivos se organizarán por iniciales del alumno. ${r.alumno?`Ejemplo: <strong>${iniciales(r.alumno)}</strong> → carpeta "${iniciales(r.alumno)}_${primerTrozo(r.alumno)}/"`:''}</div>
+
+    ${r.aspectos.map((a,i)=>`
+      <div class="aspecto">
+        <div class="aspecto-cabecera">
+          <input type="text" style="flex:1;" value="${esc(a.titulo)}" oninput="asp_titulo(${i}, this.value)">
+          ${r.aspectos.length>1?`<button class="btn-peq" onclick="asp_eliminar(${i})">🗑️</button>`:''}
+        </div>
+        <textarea rows="3" oninput="asp_contenido(${i}, this.value)">${esc(a.contenido)}</textarea>
+      </div>`).join('')}
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn btn-azul" onclick="verPreviewRegistro()">👁 Vista Previa</button>
+      <button class="btn btn-rojo" onclick="guardarRegistro()">💾 ${modoEdicion?'Actualizar':'Guardar'}</button>
+      <button class="btn btn-gris" onclick="irVista('registros')">Cancelar</button>
+    </div>
+  </div>`;
+}
+function r_actualizar(campo,valor){ registroActual[campo]=valor; render(); }
+function asp_titulo(i,val){ registroActual.aspectos[i].titulo=val; }
+function asp_contenido(i,val){ registroActual.aspectos[i].contenido=val; }
+function asp_eliminar(i){ registroActual.aspectos.splice(i,1); render(); }
+function agregarAspecto(){ registroActual.aspectos.push({titulo:'',contenido:''}); render(); }
+function restaurarAspectos(){ registroActual.aspectos = aspectosDefecto(); render(); }
+
+function verPreviewRegistro(){
+  const r = registroActual;
+  if(!r.alumno || !r.area){ alert('Completa al menos alumno y área antes de la vista previa'); return; }
+  mostrandoPreview = true; render();
+}
+function verPreviewPrograma(){
+  mostrandoPreview = true; render();
+}
+function previewRegistro(){
+  const r = registroActual;
+  const prog = r.programa==='Personalizado' ? r.programaPersonalizado : r.programa;
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
+      <h2>Vista Previa</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-gris" onclick="mostrandoPreview=false;render()">✏️ Seguir editando</button>
+        <button class="btn btn-rojo" onclick="guardarRegistro()">💾 ${modoEdicion?'Actualizar':'Guardar'}</button>
+      </div>
+    </div>
+    <div style="border:1px solid var(--gris-200);padding:24px;">
+      <h3 style="text-align:center;text-transform:uppercase;">Registro de Seguimiento</h3>
+      <p style="text-align:center;color:var(--rojo);font-weight:bold;">${esc(prog)}</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        ${filaTabla('ÁREA/MATERIA',r.area)}
+        ${filaTabla('PROFESOR',r.profesor)}
+        ${filaTabla('ALUMNO',r.alumno)}
+        ${filaTabla('CURSO',r.curso)}
+        ${filaTabla('EVALUACIÓN',r.evaluacion)}
+      </table>
+      <h4>ASPECTOS A REVISAR</h4>
+      <table style="width:100%;border-collapse:collapse;">
+        ${r.aspectos.map(a=>`<tr><td style="border:1px solid #000;padding:8px;width:30%;background:#f9fafb;font-weight:bold;">${esc(a.titulo)}</td><td style="border:1px solid #000;padding:8px;">${esc(a.contenido)}</td></tr>`).join('')}
+      </table>
+    </div>
+  </div>`;
+}
+function previewPrograma(){
+  const p = programaActual;
+  const tipo = p.tipoPrograma==='custom' ? p.tipoPersonalizado : p.tipoPrograma;
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
+      <h2>Vista Previa</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-gris" onclick="mostrandoPreview=false;render()">✏️ Seguir editando</button>
+        <button class="btn btn-azul" onclick="guardarPrograma()">💾 ${modoEdicion?'Actualizar':'Guardar'}</button>
+      </div>
+    </div>
+    <div style="border:1px solid var(--gris-200);padding:24px;">
+      <h3 style="text-align:center;text-transform:uppercase;">${esc(tipo||'[Sin tipo]')}</h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        ${filaTabla('ALUMNO',p.alumno)} ${filaTabla('CURSO',p.curso)} ${filaTabla('ASIGNATURA',p.asignatura)}
+      </table>
+      ${['metodologia','actividades','recursos','evaluacion'].map(c=>{
+        const titulos = {metodologia:'METODOLOGÍA', actividades:'ACTIVIDADES Y TAREAS', recursos:'RECURSOS DIDÁCTICOS', evaluacion:'INSTRUMENTOS DE EVALUACIÓN'};
+        return `<div style="margin-bottom:14px;"><div style="background:#e5e7eb;padding:6px;font-weight:bold;text-align:center;">${titulos[c]}</div><div style="border:1px solid #000;border-top:none;padding:10px;">${esc(p[c]).replace(/\n/g,'<br>')}</div></div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+function filaTabla(k,v){ return `<tr><td style="border:1px solid #000;padding:6px;background:#f3f4f6;font-weight:bold;width:25%;">${k}:</td><td style="border:1px solid #000;padding:6px;">${esc(v)||'[Sin especificar]'}</td></tr>`; }
+
+/* ===================== GUARDAR / EDITAR / ELIMINAR ===================== */
+function guardarRegistro(){
+  const r = registroActual;
+  if(!r.alumno || !r.area){ alert('Completa al menos alumno y área'); return; }
+  const programaFinal = r.programa==='Personalizado' ? r.programaPersonalizado : r.programa;
+  if(r.programa==='Personalizado' && !r.programaPersonalizado.trim()){ alert('Especifica el nombre del programa personalizado'); return; }
+  const datos = {...r, programa:programaFinal, fecha: r.fecha || new Date().toLocaleDateString('es-ES')};
+  delete datos.programaPersonalizado;
+
+  if(modoFirebase){
+    if(modoEdicion && r._key) db.ref('registros/'+r._key).set(datos);
+    else db.ref('registros').push(datos);
+  } else {
+    if(modoEdicion){ registros = registros.map(x=>x.id===r.id?datos:x); }
+    else { datos.id = Date.now(); registros.push(datos); }
+    guardarColeccion('registros', registros);
+  }
+  mostrandoPreview=false; irVista('registros');
+}
+function editarRegistro(i){
+  const r = registros[i];
+  const esPersonalizado = !programasTipo.includes(r.programa);
+  registroActual = esPersonalizado ? {...r, programa:'Personalizado', programaPersonalizado:r.programa} : {...r, programaPersonalizado:''};
+  modoEdicion=true; mostrandoPreview=false; vista='formRegistro'; render();
+}
+function eliminarRegistro(i){
+  if(!confirm('¿Eliminar este registro?')) return;
+  const r = registros[i];
+  if(modoFirebase && r._key) db.ref('registros/'+r._key).remove();
+  else { registros.splice(i,1); guardarColeccion('registros', registros); render(); }
+}
+
+function guardarPrograma(){
+  const p = programaActual;
+  if(!p.alumno || !p.asignatura || !p.tipoPrograma){ alert('Completa tipo de programa, alumno y asignatura'); return; }
+  const tipoFinal = p.tipoPrograma==='custom' ? p.tipoPersonalizado : p.tipoPrograma;
+  if(p.tipoPrograma==='custom' && !p.tipoPersonalizado.trim()){ alert('Especifica el nombre del programa personalizado'); return; }
+  const datos = {...p, tipoPrograma:tipoFinal, fecha: p.fecha || new Date().toLocaleDateString('es-ES')};
+  delete datos.tipoPersonalizado;
+
+  if(modoFirebase){
+    if(modoEdicion && p._key) db.ref('programas/'+p._key).set(datos);
+    else db.ref('programas').push(datos);
+  } else {
+    if(modoEdicion){ programas = programas.map(x=>x.id===p.id?datos:x); }
+    else { datos.id = Date.now(); programas.push(datos); }
+    guardarColeccion('programas', programas);
+  }
+  mostrandoPreview=false; irVista('programas');
+}
+function editarPrograma(i){
+  programaActual = {...programas[i], tipoPersonalizado:''};
+  modoEdicion=true; vista='formPrograma'; render();
+}
+function eliminarPrograma(i){
+  if(!confirm('¿Eliminar este programa?')) return;
+  const p = programas[i];
+  if(modoFirebase && p._key) db.ref('programas/'+p._key).remove();
+  else { programas.splice(i,1); guardarColeccion('programas', programas); render(); }
+}
+
+/* ===================== EXPORTAR ===================== */
+function descargarHTML(nombreArchivo, contenido){
+  const blob = new Blob([contenido], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=nombreArchivo+'.html'; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function exportarRegistroPDF(i){
+  const r = registros[i];
+  const ini = iniciales(r.alumno);
+  const nombreArchivo = `${ini}_${(r.evaluacion||'Evaluacion').replace(/\s+/g,'_')}_${new Date().toLocaleDateString().replace(/\//g,'-')}`;
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    @page{margin:15mm;size:A4;} body{font-family:Arial;color:#333;font-size:11px;}
+    .header{display:flex;justify-content:space-between;border-bottom:4px solid #dc2626;padding-bottom:12px;margin-bottom:20px;}
+    .logo{font-size:24px;font-weight:bold;color:#dc2626;} table{width:100%;border-collapse:collapse;margin-bottom:15px;}
+    th,td{border:1px solid #374151;padding:8px;} .tit{background:#f9fafb;font-weight:bold;width:30%;}
+  </style></head><body>
+  <div class="header"><div class="logo">salesianos<br><small>TRIANA</small></div><div><strong>Colegio San Pedro</strong></div></div>
+  <h2 style="text-align:center;">REGISTRO DE SEGUIMIENTO</h2>
+  <p style="text-align:center;color:#dc2626;font-weight:bold;">${esc(r.programa)}</p>
+  <table>${filaTabla('ÁREA/MATERIA',r.area)}${filaTabla('PROFESOR',r.profesor)}${filaTabla('ALUMNO',r.alumno)}${filaTabla('CURSO',r.curso)}${filaTabla('EVALUACIÓN',r.evaluacion)}${filaTabla('FECHA',r.fecha)}</table>
+  <h3>ASPECTOS A REVISAR</h3>
+  <table>${r.aspectos.map(a=>`<tr><td class="tit">${esc(a.titulo)}</td><td>${esc(a.contenido)}</td></tr>`).join('')}</table>
+  <p style="text-align:center;margin-top:30px;font-size:9px;color:#6b7280;">COLEGIO SAN PEDRO - SALESIANOS TRIANA<br>C/ CONDES DE BUSTILLO 17 | 41010 SEVILLA</p>
+  </body></html>`;
+  descargarHTML(nombreArchivo, html);
+}
+function exportarProgramaPDF(i){
+  const p = programas[i];
+  const ini = iniciales(p.alumno);
+  const nombreArchivo = `${ini}_${p.tipoPrograma.replace(/\s+/g,'_')}_${new Date().toLocaleDateString().replace(/\//g,'-')}`;
+  const secciones = {metodologia:'METODOLOGÍA A UTILIZAR', actividades:'TIPOS DE ACTIVIDADES Y TAREAS', recursos:'RECURSOS DIDÁCTICOS', evaluacion:'INSTRUMENTOS DE EVALUACIÓN'};
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    @page{margin:15mm;size:A4;} body{font-family:Arial;color:#333;font-size:11px;}
+    .header{display:flex;justify-content:space-between;border-bottom:4px solid #2a5d9f;padding-bottom:12px;margin-bottom:20px;}
+    .logo{font-size:24px;font-weight:bold;color:#2a5d9f;} table{width:100%;border-collapse:collapse;margin-bottom:15px;}
+    td{border:1px solid #374151;padding:8px;} .st{background:#c0c0c0;padding:8px;font-weight:bold;text-align:center;border:2px solid #000;}
+    .sc{border:2px solid #000;border-top:none;padding:12px;}
+  </style></head><body>
+  <div class="header"><div class="logo">salesianos<br><small>TRIANA</small></div><div><strong>Colegio San Pedro</strong></div></div>
+  <h2 style="text-align:center;">${esc(p.tipoPrograma)}</h2>
+  <table><tr><td style="font-weight:bold;width:25%;">ALUMNO:</td><td>${esc(p.alumno)}</td></tr><tr><td style="font-weight:bold;">CURSO:</td><td>${esc(p.curso)}</td></tr><tr><td style="font-weight:bold;">ASIGNATURA:</td><td>${esc(p.asignatura)}</td></tr></table>
+  ${Object.keys(secciones).map(k=>`<div class="st">${secciones[k]}</div><div class="sc">${esc(p[k]).replace(/\n/g,'<br>')}</div><br>`).join('')}
+  <p style="text-align:center;margin-top:30px;font-size:9px;color:#6b7280;">COLEGIO SAN PEDRO - SALESIANOS TRIANA<br>C/ CONDES DE BUSTILLO 17 | 41010 SEVILLA</p>
+  </body></html>`;
+  descargarHTML(nombreArchivo, html);
+}
+
+iniciarApp();
+</script>
+</body>
+</html>
