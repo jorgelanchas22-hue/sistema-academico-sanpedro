@@ -104,10 +104,13 @@
 
 <script>
 const firebaseConfig = {
-  // apiKey: "...",
-  // authDomain: "...",
-  // databaseURL: "https://TU-PROYECTO-default-rtdb.europe-west1.firebasedatabase.app",
-  // projectId: "...",
+  apiKey: "AIzaSyChzZjDRP46jGZ7-SeDuR07CD_WMZD-jDc",
+  authDomain: "sistema-academico-sanpedro.firebaseapp.com",
+  databaseURL: "https://sistema-academico-sanpedro-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "sistema-academico-sanpedro",
+  storageBucket: "sistema-academico-sanpedro.firebasestorage.app",
+  messagingSenderId: "784319467423",
+  appId: "1:784319467423:web:d954a32ee94124d8f777aa"
 };
 
 let db = null;
@@ -120,7 +123,6 @@ try {
   }
 } catch(e){ console.warn("Firebase no configurado, usando modo demo.", e); }
 
-/* ===================== ALUMNOS POR DEFECTO (carga inicial) ===================== */
 const alumnosPorCursoDefecto = {
 "1A":["Alejandro Álvarez García","María Benítez López","Carlos Cabrera Ruiz","Daniela Díaz Moreno","Eduardo Fernández Silva","Fátima González Torres","Gabriel Hernández Vega","Helena Jiménez Ramos","Iván López Martín","Julia Martínez Soto","Kevin Muñoz Herrera","Lucía Navarro Peña","Miguel Ortega Castro","Natalia Pérez Vázquez","Óscar Ramírez Jiménez","Paula Rodríguez Luna","Quique Sánchez Molina","Rosa Torres Aguilar","Sergio Vargas Medina","Teresa Vidal Romero"],
 "1B":["Ana Alonso Guerrero","Bruno Blanco Serrano","Carmen Calvo Iglesias","Diego Delgado Prieto","Elena Espinosa Núñez","Fernando Flores Castillo","Gracia García Domínguez","Hugo Herrera Gallego","Isabel Iglesias Morales","Javier Jiménez Fuentes","Lara López Benítez","Manuel Moreno Rubio","Nerea Navarro Campos","Omar Ortiz Valdés","Pilar Pascual Rivera","Raúl Ramos Cortés","Silvia Soto Herrero","Tomás Torres Bermejo","Úrsula Urrutia Leal","Víctor Vega Paredes"],
@@ -260,7 +262,6 @@ function vistaDashboard(){
   </div>`;
 }
 
-/* ===================== GESTIÓN DE ALUMNOS ===================== */
 function vistaGestionAlumnos(){
   return `
   <div class="card">
@@ -273,12 +274,22 @@ function vistaGestionAlumnos(){
         </select>
       </div>
       <div>
-        <label>Añadir alumno a ${nombreCursoLegible(cursoSeleccionadoGestion)}</label>
+        <label>Añadir un alumno a ${nombreCursoLegible(cursoSeleccionadoGestion)}</label>
         <div style="display:flex;gap:8px;">
           <input type="text" id="nuevoAlumnoInput" placeholder="Nombre completo del alumno">
           <button class="btn btn-verde" onclick="añadirAlumno()">＋ Añadir</button>
         </div>
       </div>
+    </div>
+
+    <div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:20px;">
+      <label>Importar lista completa de clase (un alumno por línea)</label>
+      <textarea id="listaAlumnosInput" rows="8" placeholder="Pega aquí la lista completa, un nombre por línea. Ejemplo:&#10;García López, Ana&#10;Martínez Ruiz, Carlos&#10;..."></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+        <button class="btn btn-azul" onclick="importarListaAlumnos(false)">📋 Añadir a la lista actual</button>
+        <button class="btn btn-rojo" onclick="importarListaAlumnos(true)">🔄 Reemplazar lista completa</button>
+      </div>
+      <div class="nota" style="margin-top:10px;margin-bottom:0;">"Añadir" mantiene los alumnos que ya había y suma los nuevos (evitando duplicados). "Reemplazar" borra la lista actual de ${nombreCursoLegible(cursoSeleccionadoGestion)} y pone solo los que pegues.</div>
     </div>
 
     <div class="nota">Curso: <strong>${nombreCursoLegible(cursoSeleccionadoGestion)}</strong> — ${(alumnosPorCurso[cursoSeleccionadoGestion]||[]).length} alumnos</div>
@@ -311,6 +322,34 @@ function añadirAlumno(){
   render();
 }
 
+function importarListaAlumnos(reemplazar){
+  const textarea = document.getElementById('listaAlumnosInput');
+  const texto = textarea.value.trim();
+  if(!texto){ alert('Pega primero la lista de alumnos, un nombre por línea'); return; }
+
+  const nombresNuevos = texto.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+
+  if(nombresNuevos.length === 0){ alert('No se ha detectado ningún nombre válido'); return; }
+
+  if(reemplazar){
+    if(!confirm(`Esto va a reemplazar toda la lista de ${nombreCursoLegible(cursoSeleccionadoGestion)} (${(alumnosPorCurso[cursoSeleccionadoGestion]||[]).length} alumnos actuales) por ${nombresNuevos.length} alumnos nuevos. ¿Continuar?`)) return;
+    alumnosPorCurso[cursoSeleccionadoGestion] = [...nombresNuevos].sort((a,b)=>a.localeCompare(b,'es'));
+  } else {
+    if(!alumnosPorCurso[cursoSeleccionadoGestion]) alumnosPorCurso[cursoSeleccionadoGestion] = [];
+    const existentes = new Set(alumnosPorCurso[cursoSeleccionadoGestion]);
+    let añadidos = 0;
+    nombresNuevos.forEach(n=>{
+      if(!existentes.has(n)){ alumnosPorCurso[cursoSeleccionadoGestion].push(n); existentes.add(n); añadidos++; }
+    });
+    alumnosPorCurso[cursoSeleccionadoGestion].sort((a,b)=>a.localeCompare(b,'es'));
+    alert(`Añadidos ${añadidos} alumnos nuevos (${nombresNuevos.length - añadidos} ya estaban en la lista y se han ignorado).`);
+  }
+
+  textarea.value = '';
+  guardarAlumnos();
+  render();
+}
+
 function eliminarAlumno(i){
   if(!confirm('¿Eliminar este alumno de la lista? (No borra sus registros o programas ya creados)')) return;
   alumnosPorCurso[cursoSeleccionadoGestion].splice(i,1);
@@ -318,7 +357,6 @@ function eliminarAlumno(i){
   render();
 }
 
-/* ===================== LISTAS ===================== */
 function vistaListaProgramas(){
   if(programas.length===0){
     return `<div class="card"><h2>Programas Educativos</h2>
@@ -371,7 +409,6 @@ function vistaListaRegistros(){
       </div>`).join('') + `</div>`;
 }
 
-/* ===================== FORMULARIOS ===================== */
 function formPrograma(){
   const p = programaActual;
   const opcionesTipo = ['Programa de Refuerzo NEAE Ed.Básica','Programa de Profundización','Programa de Enriquecimiento Curricular','Programa de Ampliación','Programa de Apoyo Educativo','Programa de Atención a la Diversidad','Programa Específico Personalizado'];
@@ -570,7 +607,6 @@ function previewPrograma(){
 }
 function filaTabla(k,v){ return `<tr><td style="border:1px solid #000;padding:6px;background:#f3f4f6;font-weight:bold;width:25%;">${k}:</td><td style="border:1px solid #000;padding:6px;">${esc(v)||'[Sin especificar]'}</td></tr>`; }
 
-/* ===================== GUARDAR / EDITAR / ELIMINAR ===================== */
 function guardarRegistro(){
   const r = registroActual;
   if(!r.alumno || !r.area){ alert('Completa al menos alumno y área'); return; }
@@ -631,7 +667,6 @@ function eliminarPrograma(i){
   else { programas.splice(i,1); guardarColeccion('programas', programas); render(); }
 }
 
-/* ===================== EXPORTAR ===================== */
 function descargarHTML(nombreArchivo, contenido){
   const blob = new Blob([contenido], {type:'text/html;charset=utf-8'});
   const url = URL.createObjectURL(blob);
