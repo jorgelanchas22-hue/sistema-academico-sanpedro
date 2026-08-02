@@ -238,16 +238,16 @@ const cursos = ["1A","1B","1C","2A","2B","2C","3A","3B","3C","4A","4B","4C","1BA
 const asignaturas = ['Lengua Castellana y Literatura','Matemáticas','Geografía e Historia','Biología y Geología','Física y Química','Inglés','Francés','Educación Física','Tecnología','Música','Educación Plástica Visual y Audiovisual','Religión/Valores Éticos','Latín','Economía','Filosofía','Iniciación a la Actividad Emprendedora','Segunda Lengua Extranjera','Cultura Clásica'];
 
 /* =========================================================
-   TIPOS DE PROGRAMA REALES DEL CENTRO
+   TIPOS DE PROGRAMA REALES DEL CENTRO (5)
 ========================================================= */
 const programasTipo = [
-  'ACAI',
+  'PROFUNDIZACIÓN',
   'ACS',
   'NO PROMOCIONA',
   'NO SUPERA ÁREAS DE CURSO ANTERIOR',
-  'PRA (alumno que presenta NEAE)',
-  'PROFUNDIZACIÓN'
+  'PRA (alumno que presenta NEAE)'
 ];
+const TIPO_EXCLUSIVO = 'PROFUNDIZACIÓN';
 
 const aspectosDefecto = () => ([
   {titulo:'Eficacia de las medidas', contenido:'La eficacia ha sido positiva ya que las medidas adoptadas en su momento han servido para que el alumno obtenga los objetivos previamente planteados y estipulados para su consecución.'},
@@ -261,7 +261,7 @@ const programaDefecto = () => ({
 });
 
 /* =========================================================
-   PLANTILLAS POR TIPO DE PROGRAMA (6 REALES DEL CENTRO)
+   PLANTILLAS POR TIPO DE PROGRAMA (5 REALES DEL CENTRO)
 ========================================================= */
 const plantillasPorTipoProgramaDefecto = {
   'PROFUNDIZACIÓN': {
@@ -293,12 +293,6 @@ const plantillasPorTipoProgramaDefecto = {
     actividades: 'ADAPTACIÓN EN LAS ACTIVIDADES Y TAREAS:\n\nTipos de actividades y tareas que se trabajarán en el aula:\n- Actividades individuales: con el fin de aumentar su autonomía. Se realizarán en el cuaderno o a través de fichas adaptadas, teniendo siempre como centro las necesidades que demanda el alumno/a.\n- Actividades en grupo: para reforzar y trabajar las habilidades sociales y las relaciones con sus iguales, y aprender de otra manera los saberes básicos propuestos para el curso.\n- Fichas evaluables: para saber si el alumno/a está adquiriendo los saberes básicos trabajados.\n- Exposición y presentación de trabajos: tanto de manera grupal como individual.\n- Actividades interactivas: mediante visionado/audición en pantalla o a través del ordenador de la profesora.\n\nTodas estas actividades estarán adaptadas a las necesidades del alumno/a, cambiando el tipo de adaptación si fuese necesario en cualquier momento del curso escolar.',
     recursos: 'RECURSOS MATERIALES: Bibliografía, publicaciones, programas editados, software informático, referencias web, materiales didácticos.\n\nLibro, cuaderno, material adaptado, actividades de refuerzo, programas educativos para determinados contenidos. Se utilizarán recursos técnicos y didácticos que permitan una metodología más activa en caso necesario.',
     evaluacion: 'PROCEDIMIENTOS E INSTRUMENTOS DE EVALUACIÓN:\n\nLa evaluación de la materia tendrá en todo momento como referentes los criterios de evaluación y su contribución al grado de adquisición de las competencias específicas.\n\nSe utilizarán distintos instrumentos, ajustados a los criterios de evaluación y a las características específicas del alumnado: cuestionarios, formularios, presentaciones, exposiciones orales, producciones escritas y/o digitales, pruebas, escalas de observación, rúbricas o portfolios, cuaderno, actividades interactivas.\n\nTodos los criterios de evaluación (relacionados con los saberes básicos) indicados en la adaptación serán ponderados con igual peso.\n• Los diferentes instrumentos se evaluarán también por criterios.\n• Cada criterio será puntuado según el grado de adquisición de los saberes básicos relacionados con ese criterio (valoración del 1 al 10).\n• Los resultados de la evaluación trimestral se expresan mediante: Insuficiente (IN), Suficiente (SF), Bien (B), Notable (NT) y Sobresaliente (SB), siendo negativa el Insuficiente y positivas las demás. Correspondencia numérica: IN (1-4), SF (5), B (6), NT (7-8), SB (9-10).\n• La nota del trimestre vendrá determinada por la nota media de los criterios evaluados en los diferentes instrumentos de dicho trimestre.\n• Si la nota media es igual o superior a 5, el alumno/a aprueba el trimestre; si es inferior a 5, lo suspende.\n\nCRITERIOS DE CALIFICACIÓN: evaluación continua global (media aritmética de todos los referentes evaluados desde el comienzo de curso). Redondeo a la unidad más próxima si la nota es ≥5; por defecto si es <5.\n\nA la finalización del curso, la calificación final se obtendrá de la media aritmética de todos los referentes evaluados durante el curso.'
-  },
-  'ACAI': {
-    metodologia: 'ETAPA Y NIVEL DE REFERENCIA:\nEtapa de referencia: [completar]\nNivel de referencia: [completar]',
-    actividades: 'ACTIVIDADES Y TAREAS DE AMPLIACIÓN:\n[completar con las actividades de ampliación específicas para este alumno/a]',
-    recursos: 'RECURSOS DIDÁCTICOS, AGRUPAMIENTOS, DISTRIBUCIÓN DE ESPACIOS Y TIEMPOS:\n[completar]',
-    evaluacion: 'PROCEDIMIENTOS E INSTRUMENTOS DE EVALUACIÓN:\n[completar]'
   }
 };
 
@@ -400,19 +394,6 @@ function alumnosConProgramaEnCurso(curso){
   return [...nombres].sort((a,b)=>a.localeCompare(b,'es'));
 }
 
-function alumnosPendientesDeSeguimiento(){
-  const alumnosConRegistro = new Set(registros.map(r => r.alumno));
-  const vistos = new Set();
-  const pendientes = [];
-  programas.forEach(p=>{
-    if(!alumnosConRegistro.has(p.alumno) && !vistos.has(p.alumno)){
-      vistos.add(p.alumno);
-      pendientes.push({ alumno: p.alumno, curso: p.curso, tipoPrograma: p.tipoPrograma });
-    }
-  });
-  return pendientes;
-}
-
 /* =========================================================
    NAVEGACIÓN
 ========================================================= */
@@ -422,7 +403,6 @@ function nuevoRegistro(alumnoPre, cursoPre, programaPre){
   registroActual = {
     id:null,
     programa: programaPre || programasTipo[0],
-    programaPersonalizado:'',
     area:'',
     profesor:'',
     alumno: alumnoPre || '',
@@ -435,7 +415,7 @@ function nuevoRegistro(alumnoPre, cursoPre, programaPre){
 function nuevoPrograma(){
   modoEdicion=false;
   const base = programaDefecto();
-  programaActual = { id:null, tipoPrograma:'', tipoPersonalizado:'', curso:'', alumno:'', asignatura:'', ...base };
+  programaActual = { id:null, tipoPrograma:'', curso:'', alumno:'', asignatura:'', profesor:'', ...base };
   vista='formPrograma'; render();
 }
 
@@ -612,7 +592,7 @@ function formPlantilla(){
     <h2>${modoEdicionPlantilla ? 'Editar plantilla' : 'Nueva plantilla de tipo de programa'}</h2>
     <div style="margin-bottom:16px;">
       <label>Nombre del tipo de programa</label>
-      <input type="text" id="nombrePlantillaInput" value="${esc(plantillaActualNombre)}" placeholder="Ej: Programa de Altas Capacidades" ${modoEdicionPlantilla?'disabled':''}>
+      <input type="text" id="nombrePlantillaInput" value="${esc(plantillaActualNombre)}" placeholder="Ej: Programa Específico Personalizado" ${modoEdicionPlantilla?'disabled':''}>
     </div>
     ${['metodologia','actividades','recursos','evaluacion'].map(campo=>{
       const titulos = {metodologia:'Metodología a Utilizar', actividades:'Tipos de Actividades y Tareas', recursos:'Recursos Didácticos', evaluacion:'Instrumentos de Evaluación'};
@@ -667,29 +647,12 @@ function vistaListaProgramas(){
 }
 
 function vistaListaRegistros(){
-  const pendientes = alumnosPendientesDeSeguimiento();
-  const avisoPendientes = pendientes.length === 0 ? '' : `
-    <div class="card" style="border-left:4px solid var(--rojo);">
-      <h2 style="margin-top:0;">Pendientes de seguimiento (${pendientes.length})</h2>
-      <p style="color:#6b7280;font-size:14px;margin-top:-10px;">Estos alumnos tienen un Programa Educativo pero todavía no tienen ningún Registro de Seguimiento.</p>
-      ${pendientes.map(p=>`
-        <div class="item-lista">
-          <div class="info">
-            <h3>${esc(p.alumno)}<span class="badge badge-ini">${iniciales(p.alumno)}</span><span class="badge badge-azul">${esc(p.tipoPrograma)}</span></h3>
-            <div class="meta"><div><strong>Curso:</strong> ${nombreCursoLegible(p.curso)}</div></div>
-          </div>
-          <div class="acciones">
-            <button class="btn btn-rojo" style="padding:6px 12px;font-size:13px;" onclick="nuevoRegistro('${esc(p.alumno).replace(/'/g,"\\'")}','${p.curso}')">＋ Crear seguimiento</button>
-          </div>
-        </div>`).join('')}
-    </div>`;
-
-  if(registros.length===0 && pendientes.length===0){
+  if(registros.length===0){
     return `<div class="card"><h2>Registros de Seguimiento</h2>
       <div class="vacio"><p>No hay registros guardados</p>
       <button class="btn btn-rojo" onclick="nuevoRegistro()">Crear primer registro</button></div></div>`;
   }
-  const listaRegistros = registros.length===0 ? '' : `<div class="card"><h2>Registros de Seguimiento</h2>` +
+  return `<div class="card"><h2>Registros de Seguimiento</h2>` +
     registros.map((r,i)=>`
       <div class="item-lista">
         <div class="info">
@@ -708,8 +671,6 @@ function vistaListaRegistros(){
           <button class="btn-peq" title="Eliminar" onclick="eliminarRegistro(${i})">🗑️</button>
         </div>
       </div>`).join('') + `</div>`;
-
-  return avisoPendientes + listaRegistros;
 }
 
 /* =========================================================
@@ -721,7 +682,7 @@ function formPrograma(){
   <div class="card">
     <h2>${modoEdicion?'Editar':'Nuevo'} Programa Educativo</h2>
     <div class="grid">
-      <div style="grid-column:span 2;">
+      <div>
         <label>Tipo de Programa</label>
         <select onchange="p_cambiarTipo(this.value)">
           <option value="">-- Selecciona tipo --</option>
@@ -748,6 +709,10 @@ function formPrograma(){
           <option value="">-- Selecciona asignatura --</option>
           ${asignaturas.map(a=>`<option value="${a}" ${p.asignatura===a?'selected':''}>${a}</option>`).join('')}
         </select>
+      </div>
+      <div>
+        <label>Profesor</label>
+        <input type="text" value="${esc(p.profesor||'')}" oninput="p_actualizar('profesor', this.value)" placeholder="Nombre del profesor">
       </div>
     </div>
 
@@ -786,7 +751,7 @@ function formRegistro(){
   <div class="card">
     <h2>${modoEdicion?'Editar':'Nuevo'} Registro de Seguimiento</h2>
     <div class="grid">
-      <div style="grid-column:span 2;">
+      <div>
         <label>Programa</label>
         <select onchange="r_actualizar('programa', this.value)">
           ${programasTipo.map(pr=>`<option value="${pr}" ${r.programa===pr?'selected':''}>${pr}</option>`).join('')}
@@ -822,7 +787,7 @@ function formRegistro(){
         <label>Evaluación</label>
         <select onchange="r_actualizar('evaluacion', this.value)">
           <option value="">Seleccionar evaluación</option>
-          ${['Primera evaluación','Segunda evaluación','Tercera evaluación','Tercera-Final evaluación','Evaluación extraordinaria'].map(e=>`<option value="${e}" ${r.evaluacion===e?'selected':''}>${e}</option>`).join('')}
+          ${['Primera evaluación','Segunda evaluación','Tercera evaluación','Evaluación extraordinaria'].map(e=>`<option value="${e}" ${r.evaluacion===e?'selected':''}>${e}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -911,7 +876,7 @@ function previewPrograma(){
     <div style="border:1px solid var(--gris-200);padding:24px;">
       <h3 style="text-align:center;text-transform:uppercase;">${esc(p.tipoPrograma||'[Sin tipo]')}</h3>
       <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-        ${filaTabla('ALUMNO',p.alumno)} ${filaTabla('CURSO',nombreCursoLegible(p.curso))} ${filaTabla('ASIGNATURA',p.asignatura)}
+        ${filaTabla('ALUMNO',p.alumno)} ${filaTabla('CURSO',nombreCursoLegible(p.curso))} ${filaTabla('ASIGNATURA',p.asignatura)} ${filaTabla('PROFESOR',p.profesor)}
       </table>
       ${['metodologia','actividades','recursos','evaluacion'].map(c=>{
         const titulos = {metodologia:'METODOLOGÍA', actividades:'ACTIVIDADES Y TAREAS', recursos:'RECURSOS DIDÁCTICOS', evaluacion:'INSTRUMENTOS DE EVALUACIÓN'};
@@ -929,7 +894,6 @@ function guardarRegistro(){
   const r = registroActual;
   if(!r.alumno || !r.area){ alert('Completa al menos alumno y área'); return; }
   const datos = {...r, fecha: r.fecha || new Date().toLocaleDateString('es-ES')};
-  delete datos.programaPersonalizado;
 
   if(modoFirebase){
     if(modoEdicion && r._key) db.ref('registros/'+r._key).set(datos);
@@ -942,7 +906,7 @@ function guardarRegistro(){
   mostrandoPreview=false; irVista('registros');
 }
 function editarRegistro(i){
-  registroActual = {...registros[i], programaPersonalizado:''};
+  registroActual = {...registros[i]};
   modoEdicion=true; mostrandoPreview=false; vista='formRegistro'; render();
 }
 function eliminarRegistro(i){
@@ -952,28 +916,89 @@ function eliminarRegistro(i){
   else { registros.splice(i,1); guardarColeccion('registros', registros); render(); }
 }
 
+function crearRegistroAutomatico(p, idPrograma){
+  const evaluaciones = ['Primera evaluación', 'Segunda evaluación', 'Tercera evaluación'];
+  evaluaciones.forEach(ev=>{
+    const registroNuevo = {
+      programaId: idPrograma,
+      programa: p.tipoPrograma,
+      area: p.asignatura,
+      profesor: p.profesor || '',
+      alumno: p.alumno,
+      curso: p.curso,
+      evaluacion: ev,
+      aspectos: aspectosDefecto(),
+      fecha: new Date().toLocaleDateString('es-ES')
+    };
+    if(modoFirebase){
+      db.ref('registros').push(registroNuevo);
+    } else {
+      registroNuevo.id = Date.now() + Math.random();
+      registros.push(registroNuevo);
+    }
+  });
+  if(!modoFirebase){ guardarColeccion('registros', registros); }
+}
+
 function guardarPrograma(){
   const p = programaActual;
   if(!p.alumno || !p.asignatura || !p.tipoPrograma){ alert('Completa tipo de programa, alumno y asignatura'); return; }
+
+  if(!modoEdicion){
+    const programasDelAlumno = programas.filter(x => x.alumno === p.alumno);
+    const yaTieneExclusivo = programasDelAlumno.some(x => x.tipoPrograma === TIPO_EXCLUSIVO);
+    const yaTieneAlguno = programasDelAlumno.length > 0;
+
+    if(yaTieneExclusivo){
+      alert(`${p.alumno} ya tiene un programa de PROFUNDIZACIÓN, que es exclusivo. No puede tener ningún otro programa a la vez.`);
+      return;
+    }
+    if(p.tipoPrograma === TIPO_EXCLUSIVO && yaTieneAlguno){
+      alert(`${p.alumno} ya tiene otro(s) programa(s) activo(s). PROFUNDIZACIÓN es exclusivo y no se puede combinar con otros programas.`);
+      return;
+    }
+    const mismaAsignaturaMismoTipo = programasDelAlumno.some(x => x.asignatura === p.asignatura && x.tipoPrograma === p.tipoPrograma);
+    if(mismaAsignaturaMismoTipo){
+      alert(`${p.alumno} ya tiene un programa de tipo "${p.tipoPrograma}" en ${p.asignatura}. Edítalo en vez de crear uno nuevo.`);
+      return;
+    }
+  }
+
   const datos = {...p, fecha: p.fecha || new Date().toLocaleDateString('es-ES')};
-  delete datos.tipoPersonalizado;
+  const esNuevo = !modoEdicion;
 
   if(modoFirebase){
-    if(modoEdicion && p._key) db.ref('programas/'+p._key).set(datos);
-    else db.ref('programas').push(datos);
+    if(modoEdicion && p._key){
+      db.ref('programas/'+p._key).set(datos);
+    } else {
+      const nuevaRef = db.ref('programas').push();
+      nuevaRef.set(datos).then(()=>{
+        if(esNuevo){
+          crearRegistroAutomatico(datos, nuevaRef.key);
+          alert('Programa guardado. Se han creado automáticamente los 3 registros de seguimiento (1ª, 2ª y 3ª evaluación).');
+        }
+      });
+    }
   } else {
     if(modoEdicion){ programas = programas.map(x=>x.id===p.id?datos:x); }
-    else { datos.id = Date.now(); programas.push(datos); }
-    guardarColeccion('programas', programas);
+    else {
+      datos.id = Date.now();
+      programas.push(datos);
+      guardarColeccion('programas', programas);
+      if(esNuevo){
+        crearRegistroAutomatico(datos, datos.id);
+        alert('Programa guardado. Se han creado automáticamente los 3 registros de seguimiento (1ª, 2ª y 3ª evaluación).');
+      }
+    }
   }
   mostrandoPreview=false; irVista('programas');
 }
 function editarPrograma(i){
-  programaActual = {...programas[i], tipoPersonalizado:''};
+  programaActual = {...programas[i]};
   modoEdicion=true; vista='formPrograma'; render();
 }
 function eliminarPrograma(i){
-  if(!confirm('¿Eliminar este programa?')) return;
+  if(!confirm('¿Eliminar este programa? También puedes eliminar por separado sus registros de seguimiento desde la sección Registros.')) return;
   const p = programas[i];
   if(modoFirebase && p._key) db.ref('programas/'+p._key).remove();
   else { programas.splice(i,1); guardarColeccion('programas', programas); render(); }
@@ -1032,7 +1057,7 @@ function exportarProgramaPDF(i){
   </style></head><body>
   <div class="header"><div class="logo">salesianos<br><small>TRIANA</small></div><div><strong>Colegio San Pedro</strong></div></div>
   <h2 style="text-align:center;">${esc(p.tipoPrograma)}</h2>
-  <table><tr><td style="font-weight:bold;width:25%;">ALUMNO:</td><td>${esc(p.alumno)}</td></tr><tr><td style="font-weight:bold;">CURSO:</td><td>${nombreCursoLegible(p.curso)}</td></tr><tr><td style="font-weight:bold;">ASIGNATURA:</td><td>${esc(p.asignatura)}</td></tr></table>
+  <table><tr><td style="font-weight:bold;width:25%;">ALUMNO:</td><td>${esc(p.alumno)}</td></tr><tr><td style="font-weight:bold;">CURSO:</td><td>${nombreCursoLegible(p.curso)}</td></tr><tr><td style="font-weight:bold;">ASIGNATURA:</td><td>${esc(p.asignatura)}</td></tr><tr><td style="font-weight:bold;">PROFESOR:</td><td>${esc(p.profesor||'')}</td></tr></table>
   ${Object.keys(secciones).map(k=>`<div class="st">${secciones[k]}</div><div class="sc">${esc(p[k]).replace(/\n/g,'<br>')}</div><br>`).join('')}
   <p style="text-align:center;margin-top:30px;font-size:9px;color:#6b7280;">COLEGIO SAN PEDRO - SALESIANOS TRIANA<br>C/ CONDES DE BUSTILLO 17 | 41010 SEVILLA</p>
   </body></html>`;
