@@ -324,15 +324,17 @@ function iniciarApp(){
     db.ref('registros').on('value', snap=>{ registros = objAArray(snap.val()); if(vista==='registros'||vista==='dashboard') render(); });
     db.ref('programas').on('value', snap=>{ programas = objAArray(snap.val()); if(vista==='programas'||vista==='dashboard') render(); });
     db.ref('alumnos').once('value', snap=>{
-      if(snap.val()){ alumnosPorCurso = snap.val(); }
+      const val = snap.val();
+      if(val && Object.keys(val).length > 0){ alumnosPorCurso = val; }
       else { alumnosPorCurso = alumnosPorCursoDefecto; db.ref('alumnos').set(alumnosPorCurso); }
-      db.ref('alumnos').on('value', s=>{ alumnosPorCurso = s.val()||{}; if(vista==='alumnos') render(); });
+      db.ref('alumnos').on('value', s=>{ const v=s.val(); if(v && Object.keys(v).length>0) alumnosPorCurso = v; if(vista==='alumnos') render(); });
       render();
     });
     db.ref('plantillas').once('value', snap=>{
-      if(snap.val()){ plantillasPorTipoPrograma = snap.val(); }
+      const val = snap.val();
+      if(val && Object.keys(val).length > 0){ plantillasPorTipoPrograma = val; }
       else { plantillasPorTipoPrograma = plantillasPorTipoProgramaDefecto; db.ref('plantillas').set(plantillasPorTipoPrograma); }
-      db.ref('plantillas').on('value', s=>{ plantillasPorTipoPrograma = s.val()||{}; if(vista==='plantillas') render(); });
+      db.ref('plantillas').on('value', s=>{ const v=s.val(); if(v && Object.keys(v).length>0) plantillasPorTipoPrograma = v; if(vista==='plantillas') render(); });
       render();
     });
   } else {
