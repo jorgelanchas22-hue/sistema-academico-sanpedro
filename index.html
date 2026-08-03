@@ -312,6 +312,7 @@ let cursoSeleccionadoGestion = cursos[0] || '';
 let plantillaActualNombre = null;
 let plantillaActual = null;
 let modoEdicionPlantilla = false;
+let gruposAbiertos = {};
 
 /* =========================================================
    INICIO / PERSISTENCIA
@@ -648,31 +649,62 @@ function vistaListaProgramas(){
       </div>`).join('') + `</div>`;
 }
 
+function claveGrupoRegistro(r){ return `${r.alumno}||${r.curso}||${r.area}||${r.programa}`; }
+
 function vistaListaRegistros(){
   if(registros.length===0){
     return `<div class="card"><h2>Registros de Seguimiento</h2>
       <div class="vacio"><p>No hay registros guardados</p>
       <button class="btn btn-rojo" onclick="nuevoRegistro()">Crear primer registro</button></div></div>`;
   }
+
+  const grupos = {};
+  registros.forEach((r,i)=>{
+    const clave = claveGrupoRegistro(r);
+    if(!grupos[clave]) grupos[clave] = { alumno:r.alumno, curso:r.curso, area:r.area, programa:r.programa, profesor:r.profesor, items:[] };
+    grupos[clave].items.push({...r, _idx:i});
+  });
+  const claves = Object.keys(grupos).sort((a,b)=>grupos[a].alumno.localeCompare(grupos[b].alumno,'es'));
+
   return `<div class="card"><h2>Registros de Seguimiento</h2>` +
-    registros.map((r,i)=>`
-      <div class="item-lista">
-        <div class="info">
-          <h3>${esc(r.alumno)}<span class="badge badge-ini">${iniciales(r.alumno)}</span><span class="badge badge-rojo">${esc(r.programa)}</span></h3>
-          <div class="meta">
-            <div><strong>Área:</strong> ${esc(r.area)}</div>
-            <div><strong>Curso:</strong> ${nombreCursoLegible(r.curso)}</div>
-            <div><strong>Profesor:</strong> ${esc(r.profesor)}</div>
-            <div><strong>Evaluación:</strong> ${esc(r.evaluacion)}</div>
-            <div><strong>Fecha:</strong> ${r.fecha||''}</div>
+    claves.map(clave=>{
+      const g = grupos[clave];
+      const claveJs = clave.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const abierto = !!gruposAbiertos[clave];
+      return `
+      <div class="item-lista" style="flex-direction:column;align-items:stretch;">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;cursor:pointer;" onclick="toggleGrupoRegistro('${claveJs}')">
+          <div class="info">
+            <h3>${esc(g.alumno)}<span class="badge badge-ini">${iniciales(g.alumno)}</span><span class="badge badge-rojo">${esc(g.programa)}</span></h3>
+            <div class="meta">
+              <div><strong>Área:</strong> ${esc(g.area)}</div>
+              <div><strong>Curso:</strong> ${nombreCursoLegible(g.curso)}</div>
+              <div><strong>Profesor:</strong> ${esc(g.profesor)}</div>
+              <div><strong>Evaluaciones:</strong> ${g.items.length}</div>
+            </div>
+          </div>
+          <div class="acciones" style="align-items:center;">
+            <span style="font-size:13px;color:var(--gris-600);white-space:nowrap;">${abierto?'▲ Ocultar':'▼ Ver evaluaciones'}</span>
           </div>
         </div>
-        <div class="acciones">
-          <button class="btn-peq" title="Editar" onclick="editarRegistro(${i})">✏️</button>
-          <button class="btn-peq" title="Exportar" onclick="exportarRegistroPDF(${i})">⬇️</button>
-          <button class="btn-peq" title="Eliminar" onclick="eliminarRegistro(${i})">🗑️</button>
-        </div>
-      </div>`).join('') + `</div>`;
+        ${abierto ? `<div style="margin-top:12px;border-top:1px solid var(--gris-200);padding-top:12px;display:flex;flex-direction:column;gap:8px;">
+          ${g.items.map(r=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;background:#f9fafb;border-radius:6px;padding:8px 12px;flex-wrap:wrap;gap:8px;">
+              <div><strong>${esc(r.evaluacion)}</strong> <span style="color:var(--gris-600);font-size:13px;">— ${r.fecha||''}</span></div>
+              <div class="acciones">
+                <button class="btn-peq" title="Editar" onclick="event.stopPropagation();editarRegistro(${r._idx})">✏️</button>
+                <button class="btn-peq" title="Exportar" onclick="event.stopPropagation();exportarRegistroPDF(${r._idx})">⬇️</button>
+                <button class="btn-peq" title="Eliminar" onclick="event.stopPropagation();eliminarRegistro(${r._idx})">🗑️</button>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+function toggleGrupoRegistro(clave){
+  gruposAbiertos[clave] = !gruposAbiertos[clave];
+  render();
 }
 
 /* =========================================================
