@@ -316,9 +316,9 @@ function iniciarApp(){
     });
     db.ref('plantillas').once('value', snap=>{
       const val = snap.val();
-      if(val && Object.keys(val).length > 0){ plantillasPorTipoPrograma = val; }
-      else { plantillasPorTipoPrograma = plantillasPorTipoProgramaDefecto; db.ref('plantillas').set(plantillasPorTipoPrograma); }
-      db.ref('plantillas').on('value', s=>{ const v=s.val(); if(v && Object.keys(v).length>0) plantillasPorTipoPrograma = v; if(vista==='plantillas') render(); });
+      if(val && Object.keys(val).length > 0){ plantillasPorTipoPrograma = normalizarPlantillas(val); }
+      else { plantillasPorTipoPrograma = normalizarPlantillas({}); db.ref('plantillas').set(plantillasPorTipoPrograma); }
+      db.ref('plantillas').on('value', s=>{ const v=s.val(); plantillasPorTipoPrograma = normalizarPlantillas(v || {}); if(vista==='plantillas') render(); });
       render();
     });
   } else {
@@ -327,7 +327,7 @@ function iniciarApp(){
     const guardados = localStorage.getItem('sanpedro_alumnos');
     alumnosPorCurso = guardados ? JSON.parse(guardados) : alumnosPorCursoDefecto;
     const plantillasGuardadas = localStorage.getItem('sanpedro_plantillas');
-    plantillasPorTipoPrograma = plantillasGuardadas ? JSON.parse(plantillasGuardadas) : plantillasPorTipoProgramaDefecto;
+    plantillasPorTipoPrograma = normalizarPlantillas(plantillasGuardadas ? JSON.parse(plantillasGuardadas) : {});
     render();
   }
 }
@@ -343,6 +343,22 @@ function normalizarRegistro(registro){
     ...registro,
     aspectos: aspectosValidos ? registro.aspectos : aspectosDefecto()
   };
+}
+function normalizarPlantillas(guardadas){
+  const campos = ['metodologia','actividades','recursos','evaluacion'];
+  const resultado = {};
+  programasTipo.forEach(tipo=>{
+    const base = plantillasPorTipoProgramaDefecto[tipo] || programaDefecto();
+    const personalizada = guardadas[tipo] || {};
+    resultado[tipo] = {};
+    campos.forEach(campo=>{
+      const valor = personalizada[campo];
+      resultado[tipo][campo] = (typeof valor === 'string' && valor.trim())
+        ? valor
+        : (base[campo] || '');
+    });
+  });
+  return resultado;
 }
 function guardarColeccion(nombre, arr){
   if(!modoFirebase){
@@ -780,7 +796,7 @@ function formPrograma(){
 function p_actualizar(campo,valor){ programaActual[campo]=valor; render(); }
 function p_cambiarTipo(valor){
   programaActual.tipoPrograma = valor;
-  const plantilla = plantillasPorTipoPrograma[valor];
+  const plantilla = normalizarPlantillas(plantillasPorTipoPrograma)[valor];
   if(plantilla && !modoEdicion){
     programaActual.metodologia = plantilla.metodologia;
     programaActual.actividades = plantilla.actividades;
