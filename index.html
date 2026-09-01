@@ -458,8 +458,8 @@ function vistaGuia(){
   <div class="card">
     <h2>Guía de utilización</h2>
     <div class="nota">
-      <strong>Diferencia principal:</strong> «Programas educativos creados» sirve para consultar lo ya guardado.
-      «Crear nuevo programa educativo» abre el formulario para elaborar uno nuevo.
+      <strong>Diferencia principal:</strong> los «Programas educativos creados» son documentos individualizados ya guardados, asociados a un alumno, curso y asignatura.
+      «Crear nuevo programa educativo» inicia el formulario para elaborar otro documento a partir de una plantilla predeterminada.
     </div>
 
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
@@ -683,9 +683,20 @@ function guardarPlantilla(){
 ========================================================= */
 function vistaListaProgramas(){
   const introduccion = `
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:20px;">
+      <div class="aspecto" style="border-left:5px solid var(--azul);margin:0;">
+        <h3 style="margin-top:0;color:var(--azul);">¿Qué son los programas educativos?</h3>
+        <p>Son los documentos individualizados que ya se han elaborado para un alumno, un curso y una asignatura. Recogen el tipo de programa, la metodología, las actividades, los recursos y los instrumentos de evaluación.</p>
+        <p style="margin-bottom:0;"><strong>En esta sección puedes consultarlos, editarlos, exportarlos o eliminarlos.</strong></p>
+      </div>
+      <div class="aspecto" style="border-left:5px solid var(--rojo);margin:0;">
+        <h3 style="margin-top:0;color:var(--rojo);">¿Qué significa crear un nuevo programa?</h3>
+        <p>Abre un formulario para elaborar un programa educativo que todavía no existe. Primero se elige el tipo de programa y la aplicación carga sus textos predeterminados.</p>
+        <p style="margin-bottom:0;"><strong>Después se completan el alumno, el curso, la asignatura y el profesor, se revisa el contenido y se guarda.</strong></p>
+      </div>
+    </div>
     <div class="nota" style="border-left-color:var(--azul);margin-bottom:20px;">
-      <strong>Esta pantalla muestra únicamente los programas educativos que ya han sido creados y guardados.</strong><br>
-      Para iniciar uno distinto, utiliza el botón <strong>«Crear nuevo programa educativo»</strong> del menú superior.
+      Al guardar un programa nuevo, pasará a esta lista y se crearán automáticamente sus registros de seguimiento de la primera, segunda y tercera evaluación.
     </div>`;
 
   if(programas.length===0){
