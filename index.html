@@ -645,9 +645,29 @@ function claveGrupoRegistro(r){ return `${r.alumno}||${r.curso}||${r.area}||${r.
 
 function vistaListaRegistros(){
   if(registros.length===0){
-    return `<div class="card"><h2>Registros de Seguimiento</h2>
-      <div class="vacio"><p>No hay registros guardados</p>
-      <button class="btn btn-rojo" onclick="nuevoRegistro()">Crear primer registro</button></div></div>`;
+    const aspectosDemo = aspectosDefecto();
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <h2 style="margin-bottom:6px;">Registros de Seguimiento</h2>
+          <p style="margin:0;color:var(--gris-600);">Vista demostrativa de los textos predeterminados. No contiene datos reales de alumnado.</p>
+        </div>
+        <button class="btn btn-rojo" onclick="nuevoRegistro()">Crear registro real</button>
+      </div>
+      <div style="margin-top:20px;">
+        ${programasTipo.map(programa=>`
+          <div class="item-lista" style="display:block;">
+            <h3 style="margin:0 0 12px;color:var(--rojo);">${esc(programa)}</h3>
+            <table style="width:100%;border-collapse:collapse;">
+              ${aspectosDemo.map(a=>`
+                <tr>
+                  <td style="border:1px solid var(--gris-300);padding:10px;width:30%;background:#f9fafb;font-weight:600;">${esc(a.titulo)}</td>
+                  <td style="border:1px solid var(--gris-300);padding:10px;line-height:1.45;">${esc(a.contenido)}</td>
+                </tr>`).join('')}
+            </table>
+          </div>`).join('')}
+      </div>
+    </div>`;
   }
 
   const grupos = {};
