@@ -305,7 +305,7 @@ function iniciarApp(){
   document.getElementById('estadoConexion').className = 'estado ' + (modoFirebase ? 'online' : 'demo');
 
   if(modoFirebase){
-    db.ref('registros').on('value', snap=>{ registros = objAArray(snap.val()); if(vista==='registros'||vista==='dashboard') render(); });
+    db.ref('registros').on('value', snap=>{ registros = objAArray(snap.val()).map(normalizarRegistro); if(vista==='registros'||vista==='dashboard') render(); });
     db.ref('programas').on('value', snap=>{ programas = objAArray(snap.val()); if(vista==='programas'||vista==='dashboard') render(); });
     db.ref('alumnos').once('value', snap=>{
       const val = snap.val();
@@ -322,7 +322,7 @@ function iniciarApp(){
       render();
     });
   } else {
-    registros = JSON.parse(localStorage.getItem('sanpedro_registros')||'[]');
+    registros = JSON.parse(localStorage.getItem('sanpedro_registros')||'[]').map(normalizarRegistro);
     programas = JSON.parse(localStorage.getItem('sanpedro_programas')||'[]');
     const guardados = localStorage.getItem('sanpedro_alumnos');
     alumnosPorCurso = guardados ? JSON.parse(guardados) : alumnosPorCursoDefecto;
@@ -334,6 +334,15 @@ function iniciarApp(){
 function objAArray(obj){
   if(!obj) return [];
   return Object.keys(obj).map(k=>({...obj[k], _key:k}));
+}
+function normalizarRegistro(registro){
+  const aspectosValidos = Array.isArray(registro.aspectos) &&
+    registro.aspectos.length > 0 &&
+    registro.aspectos.some(a => a && (a.titulo || a.contenido));
+  return {
+    ...registro,
+    aspectos: aspectosValidos ? registro.aspectos : aspectosDefecto()
+  };
 }
 function guardarColeccion(nombre, arr){
   if(!modoFirebase){
@@ -812,7 +821,7 @@ function formRegistro(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <h3 style="margin:0;">Aspectos a Revisar</h3>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-azul" style="padding:6px 12px;font-size:13px;" onclick="restaurarAspectos()">Restaurar Plantilla</button>
+        <button class="btn btn-azul" style="padding:6px 12px;font-size:13px;" onclick="restaurarAspectos()">Recuperar textos predeterminados</button>
         <button class="btn btn-verde" style="padding:6px 12px;font-size:13px;" onclick="agregarAspecto()">＋ Agregar</button>
       </div>
     </div>
