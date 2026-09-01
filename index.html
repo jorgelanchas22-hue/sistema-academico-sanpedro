@@ -91,13 +91,14 @@
 
   <main>
     <nav>
-      <button id="navProgramas" onclick="irVista('programas')">📚 Programas Educativos</button>
-      <button id="navRegistros" onclick="irVista('registros')">📋 Registros de Seguimiento</button>
-      <button id="navNuevoPrograma" onclick="nuevoPrograma()">＋ Nuevo Programa</button>
-      <button id="navNuevoRegistro" onclick="nuevoRegistro()">＋ Nuevo Registro</button>
-      <button id="navAlumnos" onclick="irVista('alumnos')">🎓 Gestión de Alumnos</button>
-      <button id="navPlantillas" onclick="irVista('plantillas')">📝 Gestión de Plantillas</button>
-      <button id="navDashboard" onclick="irVista('dashboard')">📊 Dashboard</button>
+      <button id="navProgramas" onclick="irVista('programas')">📚 Programas educativos creados</button>
+      <button id="navNuevoPrograma" onclick="nuevoPrograma()">＋ Crear nuevo programa educativo</button>
+      <button id="navRegistros" onclick="irVista('registros')">📋 Registros de seguimiento</button>
+      <button id="navNuevoRegistro" onclick="nuevoRegistro()">＋ Crear nuevo registro</button>
+      <button id="navAlumnos" onclick="irVista('alumnos')">🎓 Gestión de alumnos</button>
+      <button id="navPlantillas" onclick="irVista('plantillas')">📝 Plantillas de programas</button>
+      <button id="navDashboard" onclick="irVista('dashboard')">📊 Resumen</button>
+      <button id="navGuia" onclick="irVista('guia')">❓ Guía de uso</button>
     </nav>
 
     <div id="contenido"></div>
@@ -435,8 +436,8 @@ function nuevoPrograma(){
 ========================================================= */
 function render(){
   document.querySelectorAll('nav button').forEach(b=>b.className='');
-  const mapa = {programas:'navProgramas', registros:'navRegistros', dashboard:'navDashboard', formPrograma:'navNuevoPrograma', formRegistro:'navNuevoRegistro', alumnos:'navAlumnos', plantillas:'navPlantillas', formPlantilla:'navPlantillas'};
-  const colores = {navProgramas:'activo-azul', navRegistros:'activo-rojo', navDashboard:'activo-verde', navNuevoPrograma:'activo-azul', navNuevoRegistro:'activo-rojo', navAlumnos:'activo-verde', navPlantillas:'activo-azul'};
+  const mapa = {programas:'navProgramas', registros:'navRegistros', dashboard:'navDashboard', guia:'navGuia', formPrograma:'navNuevoPrograma', formRegistro:'navNuevoRegistro', alumnos:'navAlumnos', plantillas:'navPlantillas', formPlantilla:'navPlantillas'};
+  const colores = {navProgramas:'activo-azul', navRegistros:'activo-rojo', navDashboard:'activo-verde', navGuia:'activo-verde', navNuevoPrograma:'activo-azul', navNuevoRegistro:'activo-rojo', navAlumnos:'activo-verde', navPlantillas:'activo-azul'};
   const activoId = mapa[vista];
   if(activoId) document.getElementById(activoId).className = colores[activoId];
 
@@ -444,11 +445,59 @@ function render(){
   if(vista==='programas') cont.innerHTML = vistaListaProgramas();
   else if(vista==='registros') cont.innerHTML = vistaListaRegistros();
   else if(vista==='dashboard') cont.innerHTML = vistaDashboard();
+  else if(vista==='guia') cont.innerHTML = vistaGuia();
   else if(vista==='alumnos') cont.innerHTML = vistaGestionAlumnos();
   else if(vista==='plantillas') cont.innerHTML = vistaListaPlantillas();
   else if(vista==='formPlantilla') cont.innerHTML = formPlantilla();
   else if(vista==='formPrograma') cont.innerHTML = mostrandoPreview ? previewPrograma() : formPrograma();
   else if(vista==='formRegistro') cont.innerHTML = mostrandoPreview ? previewRegistro() : formRegistro();
+}
+
+function vistaGuia(){
+  return `
+  <div class="card">
+    <h2>Guía de utilización</h2>
+    <div class="nota">
+      <strong>Diferencia principal:</strong> «Programas educativos creados» sirve para consultar lo ya guardado.
+      «Crear nuevo programa educativo» abre el formulario para elaborar uno nuevo.
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+      <div class="aspecto">
+        <h3>1. Incorporar alumnado</h3>
+        <p>Entra en <strong>Gestión de alumnos</strong>, selecciona el curso y añade el código o identificación interna del alumno.</p>
+      </div>
+      <div class="aspecto">
+        <h3>2. Crear un programa</h3>
+        <p>Pulsa <strong>Crear nuevo programa educativo</strong>. Elige el tipo, el curso, el alumno y la asignatura.</p>
+      </div>
+      <div class="aspecto">
+        <h3>3. Revisar la plantilla</h3>
+        <p>Al elegir el tipo de programa se cargan metodología, actividades, recursos e instrumentos de evaluación. Puedes adaptarlos antes de guardar.</p>
+      </div>
+      <div class="aspecto">
+        <h3>4. Guardar y consultar</h3>
+        <p>Utiliza <strong>Vista previa</strong> para comprobar el documento y después <strong>Guardar</strong>. Aparecerá en <strong>Programas educativos creados</strong>.</p>
+      </div>
+      <div class="aspecto">
+        <h3>5. Realizar el seguimiento</h3>
+        <p>Al guardar un programa nuevo se crean sus registros de primera, segunda y tercera evaluación. Se consultan desde <strong>Registros de seguimiento</strong>.</p>
+      </div>
+      <div class="aspecto">
+        <h3>6. Editar o exportar</h3>
+        <p>Los iconos permiten editar, exportar o eliminar. Si conectas Drive, los documentos exportados se organizan en la carpeta configurada por curso y alumno.</p>
+      </div>
+    </div>
+
+    <h3>Qué contiene cada sección</h3>
+    <table style="width:100%;border-collapse:collapse;">
+      <tr><td style="border:1px solid var(--gris-300);padding:10px;font-weight:600;width:34%;">Programas educativos creados</td><td style="border:1px solid var(--gris-300);padding:10px;">Listado de programas ya guardados.</td></tr>
+      <tr><td style="border:1px solid var(--gris-300);padding:10px;font-weight:600;">Crear nuevo programa educativo</td><td style="border:1px solid var(--gris-300);padding:10px;">Formulario para generar un programa nuevo a partir de una plantilla.</td></tr>
+      <tr><td style="border:1px solid var(--gris-300);padding:10px;font-weight:600;">Registros de seguimiento</td><td style="border:1px solid var(--gris-300);padding:10px;">Valoración trimestral de las medidas, metodología, temporalización y acuerdos.</td></tr>
+      <tr><td style="border:1px solid var(--gris-300);padding:10px;font-weight:600;">Plantillas de programas</td><td style="border:1px solid var(--gris-300);padding:10px;">Textos predeterminados de cada tipo de programa.</td></tr>
+      <tr><td style="border:1px solid var(--gris-300);padding:10px;font-weight:600;">Resumen</td><td style="border:1px solid var(--gris-300);padding:10px;">Cifras generales de programas, registros, alumnos y cursos.</td></tr>
+    </table>
+  </div>`;
 }
 
 function vistaDashboard(){
@@ -633,12 +682,19 @@ function guardarPlantilla(){
    LISTAS
 ========================================================= */
 function vistaListaProgramas(){
+  const introduccion = `
+    <div class="nota" style="border-left-color:var(--azul);margin-bottom:20px;">
+      <strong>Esta pantalla muestra únicamente los programas educativos que ya han sido creados y guardados.</strong><br>
+      Para iniciar uno distinto, utiliza el botón <strong>«Crear nuevo programa educativo»</strong> del menú superior.
+    </div>`;
+
   if(programas.length===0){
-    return `<div class="card"><h2>Programas Educativos</h2>
-      <div class="vacio"><p>No hay programas educativos guardados</p>
-      <button class="btn btn-azul" onclick="nuevoPrograma()">Crear primer programa</button></div></div>`;
+    return `<div class="card"><h2>Programas educativos creados</h2>
+      ${introduccion}
+      <div class="vacio"><p>Todavía no hay programas educativos guardados.</p>
+      <button class="btn btn-azul" onclick="nuevoPrograma()">Crear el primer programa educativo</button></div></div>`;
   }
-  return `<div class="card"><h2>Programas Educativos</h2>` +
+  return `<div class="card"><h2>Programas educativos creados</h2>${introduccion}` +
     programas.map((p,i)=>`
       <div class="item-lista">
         <div class="info">
