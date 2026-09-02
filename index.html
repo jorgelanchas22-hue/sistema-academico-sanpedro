@@ -301,11 +301,38 @@ let gruposAbiertos = {};
 /* =========================================================
    INICIO / PERSISTENCIA
 ========================================================= */
-function iniciarApp(){
-  document.getElementById('estadoConexion').textContent = modoFirebase ? 'Conectado a Firebase' : 'Modo demo (local)';
-  document.getElementById('estadoConexion').className = 'estado ' + (modoFirebase ? 'online' : 'demo');
+function actualizarEstadoConexion(mensaje){
+  const estado = document.getElementById('estadoConexion');
+  estado.textContent = mensaje || (modoFirebase ? 'Conectado a Firebase' : 'Guardado local activo');
+  estado.className = 'estado ' + (modoFirebase ? 'online' : 'demo');
+}
+function cargarDatosLocales(){
+  registros = JSON.parse(localStorage.getItem('sanpedro_registros')||'[]').map(normalizarRegistro);
+  programas = JSON.parse(localStorage.getItem('sanpedro_programas')||'[]');
+  const guardados = localStorage.getItem('sanpedro_alumnos');
+  alumnosPorCurso = guardados ? JSON.parse(guardados) : alumnosPorCursoDefecto;
+  const plantillasGuardadas = localStorage.getItem('sanpedro_plantillas');
+  plantillasPorTipoPrograma = normalizarPlantillas(plantillasGuardadas ? JSON.parse(plantillasGuardadas) : {});
+}
+function activarGuardadoLocal(motivo){
+  if(db) db.ref().off();
+  modoFirebase = false;
+  cargarDatosLocales();
+  actualizarEstadoConexion('Guardado local activo');
+  if(motivo) console.warn('Firebase no disponible; se activa el guardado local.', motivo);
+  render();
+}
+async function iniciarApp(){
+  actualizarEstadoConexion(modoFirebase ? 'Comprobando Firebase…' : 'Guardado local activo');
 
   if(modoFirebase){
+    try {
+      await db.ref('/').once('value');
+    } catch(error) {
+      activarGuardadoLocal(error);
+      return;
+    }
+    actualizarEstadoConexion();
     db.ref('registros').on('value', snap=>{ registros = objAArray(snap.val()).map(normalizarRegistro); if(vista==='registros'||vista==='dashboard') render(); });
     db.ref('programas').on('value', snap=>{ programas = objAArray(snap.val()); if(vista==='programas'||vista==='dashboard') render(); });
     db.ref('alumnos').once('value', snap=>{
@@ -314,21 +341,16 @@ function iniciarApp(){
       else { alumnosPorCurso = alumnosPorCursoDefecto; db.ref('alumnos').set(alumnosPorCurso); }
       db.ref('alumnos').on('value', s=>{ const v=s.val(); if(v && Object.keys(v).length>0) alumnosPorCurso = v; if(vista==='alumnos') render(); });
       render();
-    });
+    }, activarGuardadoLocal);
     db.ref('plantillas').once('value', snap=>{
       const val = snap.val();
       if(val && Object.keys(val).length > 0){ plantillasPorTipoPrograma = normalizarPlantillas(val); }
       else { plantillasPorTipoPrograma = normalizarPlantillas({}); db.ref('plantillas').set(plantillasPorTipoPrograma); }
       db.ref('plantillas').on('value', s=>{ const v=s.val(); plantillasPorTipoPrograma = normalizarPlantillas(v || {}); if(vista==='plantillas') render(); });
       render();
-    });
+    }, activarGuardadoLocal);
   } else {
-    registros = JSON.parse(localStorage.getItem('sanpedro_registros')||'[]').map(normalizarRegistro);
-    programas = JSON.parse(localStorage.getItem('sanpedro_programas')||'[]');
-    const guardados = localStorage.getItem('sanpedro_alumnos');
-    alumnosPorCurso = guardados ? JSON.parse(guardados) : alumnosPorCursoDefecto;
-    const plantillasGuardadas = localStorage.getItem('sanpedro_plantillas');
-    plantillasPorTipoPrograma = normalizarPlantillas(plantillasGuardadas ? JSON.parse(plantillasGuardadas) : {});
+    cargarDatosLocales();
     render();
   }
 }
@@ -366,9 +388,19 @@ function guardarColeccion(nombre, arr){
     localStorage.setItem('sanpedro_'+nombre, JSON.stringify(arr));
   }
 }
-function guardarAlumnos(){
-  if(modoFirebase){ db.ref('alumnos').set(alumnosPorCurso); }
-  else { localStorage.setItem('sanpedro_alumnos', JSON.stringify(alumnosPorCurso)); }
+async function guardarAlumnos(){
+  const copia = JSON.stringify(alumnosPorCurso);
+  localStorage.setItem('sanpedro_alumnos', copia);
+  if(modoFirebase){
+    try {
+      await db.ref('alumnos').set(alumnosPorCurso);
+    } catch(error) {
+      modoFirebase = false;
+      actualizarEstadoConexion('Guardado local activo');
+      console.warn('No se pudo guardar en Firebase; la lista queda guardada localmente.', error);
+      alert('Firebase no está disponible. El alumnado sí ha quedado guardado en este navegador.');
+    }
+  }
 }
 function guardarPlantillas(){
   if(modoFirebase){ db.ref('plantillas').set(plantillasPorTipoPrograma); }
